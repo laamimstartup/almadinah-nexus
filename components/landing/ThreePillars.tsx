@@ -1,6 +1,6 @@
 "use client";
 import { motion } from "framer-motion";
-import { GraduationCap, Users, BookOpen, BarChart3, Brain, Shield } from "lucide-react";
+import { GraduationCap, Users, BookOpen, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 
@@ -116,7 +116,7 @@ export default function ThreePillars() {
             transition={{ delay: 0.2 }}
             className="text-white/50 text-lg max-w-2xl mx-auto"
           >
-            Designed for every stakeholder in a student's journey — from the learner to the parent to the guide.
+            Designed for every stakeholder in a student&apos;s journey — from the learner to the parent to the guide.
           </motion.p>
         </div>
 

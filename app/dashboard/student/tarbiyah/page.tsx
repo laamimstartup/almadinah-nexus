@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 import ProgressBar from "@/components/ui/ProgressBar";
 import Badge from "@/components/ui/Badge";
-import { Heart, Star, Flame, CheckCircle2, Circle, Plus, Trophy, Zap } from "lucide-react";
+import { Heart, Flame, CheckCircle2, Circle, Plus, Trophy } from "lucide-react";
 
 const tarbiyahCategories = [
   {
@@ -127,7 +127,7 @@ export default function TarbiyahPage() {
                 إِنَّمَا بُعِثْتُ لِأُتَمِّمَ مَكَارِمَ الْأَخْلاق
               </div>
               <p className="text-white/25 text-xs italic mt-1">
-                "I was sent to perfect good character." — Prophet Muhammad ﷺ
+                &ldquo;I was sent to perfect good character.&rdquo; — Prophet Muhammad ﷺ
               </p>
             </div>
             <div className="flex items-center gap-6 flex-shrink-0">
@@ -157,7 +157,7 @@ export default function TarbiyahPage() {
             {tarbiyahCategories.map((cat) => {
               const c = colorMap[cat.color];
               const doneTasks = cat.dailyTasks.filter((t) => t.done).length;
-              const taskPct   = Math.round((doneTasks / cat.dailyTasks.length) * 100);
+              const _taskPct  = Math.round((doneTasks / cat.dailyTasks.length) * 100); void _taskPct;
               return (
                 <div key={cat.id} className={`rounded-xl p-4 border ${c.border} ${c.bg}`}>
                   <div className="text-2xl mb-2">{cat.icon}</div>

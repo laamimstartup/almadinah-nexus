@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 import ProgressBar from "@/components/ui/ProgressBar";
 import Badge from "@/components/ui/Badge";
-import { Users, Search, AlertTriangle, Star, TrendingUp, Heart, ChevronRight } from "lucide-react";
+import { Search, AlertTriangle, Star, TrendingUp, Heart, ChevronRight } from "lucide-react";
 
 const students = [
   { name: "Ahmed Al-Rashid",  class: "7A", grade: "A",  pts: 847, tarbiyah: 92, engagement: 94, status: "excellent",  streak: 7  },

@@ -4,7 +4,7 @@ import DashboardShell from "@/components/dashboard/DashboardShell";
 import ProgressBar from "@/components/ui/ProgressBar";
 import Badge from "@/components/ui/Badge";
 import {
-  Users, Brain, AlertTriangle, TrendingUp, BarChart3, CheckCircle2,
+  Users, Brain, AlertTriangle, BarChart3, CheckCircle2,
   Clock, ChevronRight, Zap, Star, BookOpen, MessageSquare
 } from "lucide-react";
 

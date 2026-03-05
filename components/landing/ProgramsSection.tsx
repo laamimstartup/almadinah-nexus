@@ -1,6 +1,6 @@
 "use client";
 import { motion } from "framer-motion";
-import { BookOpen, Calculator, Globe, Star, Code, Palette, Mic2, Heart } from "lucide-react";
+import { BookOpen, Globe, Star, Code, Palette, Mic2, Heart } from "lucide-react";
 
 const programs = [
   {

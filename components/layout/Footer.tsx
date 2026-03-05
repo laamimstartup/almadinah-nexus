@@ -1,6 +1,5 @@
 "use client";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { Mail, MapPin, Phone, ExternalLink } from "lucide-react";
 
 const footerLinks = {
@@ -53,14 +52,14 @@ export default function Footer() {
 
             <p className="text-white/50 text-sm leading-relaxed max-w-xs mb-6">
               The Leadership Intelligence Platform where Islamic values meet world-class education. 
-              Building tomorrow's leaders, today.
+              Building tomorrow&apos;s leaders, today.
             </p>
 
             <div className="font-arabic text-gold-400/70 text-lg mb-2">
               طَلَبُ الْعِلْمِ فَرِيضَةٌ عَلَى كُلِّ مُسْلِمٍ
             </div>
             <p className="text-white/30 text-xs italic">
-              "Seeking knowledge is an obligation upon every Muslim." — Prophet Muhammad ﷺ
+              &ldquo;Seeking knowledge is an obligation upon every Muslim.&rdquo; — Prophet Muhammad ﷺ
             </p>
 
             <div className="mt-8 space-y-3">

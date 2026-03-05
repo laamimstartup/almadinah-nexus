@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 import ProgressBar from "@/components/ui/ProgressBar";
 import Badge from "@/components/ui/Badge";
-import { Star, TrendingUp, Zap, Trophy, Target } from "lucide-react";
+import { Star, TrendingUp, Zap, Trophy } from "lucide-react";
 
 const subjects = [
   { subject: "Quran & Tajweed", pct: 88, stars: 8, maxStars: 10, color: "#C9A84C",   variant: "gold" as const,    level: "Advanced",  xp: 880  },

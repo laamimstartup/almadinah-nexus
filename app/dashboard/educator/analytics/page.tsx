@@ -2,7 +2,7 @@
 import { motion } from "framer-motion";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 import ProgressBar from "@/components/ui/ProgressBar";
-import { BarChart3, TrendingUp, Users, Zap, AlertTriangle } from "lucide-react";
+import { BarChart3, TrendingUp, Users, AlertTriangle } from "lucide-react";
 
 const classPerformance = [
   { class: "Grade 7A", avgGrade: 91, engagement: 94, missions: 47, at_risk: 0 },

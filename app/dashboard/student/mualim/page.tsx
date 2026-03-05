@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import DashboardShell from "@/components/dashboard/DashboardShell";
-import { Brain, Send, Sparkles, BookOpen, Star, RefreshCw, Mic } from "lucide-react";
+import { Brain, Send, Sparkles, RefreshCw, Mic } from "lucide-react";
 
 interface Message {
   id: string;

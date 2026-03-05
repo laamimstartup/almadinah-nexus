@@ -5,7 +5,7 @@ import ProgressBar from "@/components/ui/ProgressBar";
 import Badge from "@/components/ui/Badge";
 import {
   TrendingUp, Calendar, MessageSquare, Video, Star, Heart,
-  CheckCircle2, AlertCircle, Clock, ChevronRight, Zap, Bell, Globe
+  CheckCircle2, AlertCircle, Clock, Zap, Bell, Globe
 } from "lucide-react";
 
 const childData = {

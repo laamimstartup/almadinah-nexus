@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import DashboardShell from "@/components/dashboard/DashboardShell";
-import Badge from "@/components/ui/Badge";
 import { MessageSquare, Send, Video, Clock, CheckCheck } from "lucide-react";
 
 const conversations = [

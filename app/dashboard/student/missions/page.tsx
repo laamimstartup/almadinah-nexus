@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 import ProgressBar from "@/components/ui/ProgressBar";
 import Badge from "@/components/ui/Badge";
-import { Target, Clock, Star, Zap, CheckCircle2, Lock, Play, Filter } from "lucide-react";
+import { Target, Clock, Zap, CheckCircle2, Lock, Play, Filter } from "lucide-react";
 
 type MissionStatus = "active" | "completed" | "locked";
 type MissionColor = "gold" | "emerald" | "blue" | "purple";

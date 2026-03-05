@@ -1,7 +1,7 @@
 "use client";
 import { motion } from "framer-motion";
 import {
-  Brain, Star, Globe, Zap, Heart, Compass, Trophy, BookOpen, Users, Shield
+  Brain, Star, Globe, Zap, Heart, Compass, Trophy, Users, Shield
 } from "lucide-react";
 
 const features = [
@@ -192,7 +192,7 @@ export default function EliteFeatures() {
             وَمَن يَتَّقِ اللَّهَ يَجْعَل لَّهُ مَخْرَجًا
           </p>
           <p className="text-white/30 text-sm italic">
-            "And whoever fears Allah — He will make for him a way out." — Quran 65:2
+            &ldquo;And whoever fears Allah — He will make for him a way out.&rdquo; — Quran 65:2
           </p>
         </motion.div>
       </div>

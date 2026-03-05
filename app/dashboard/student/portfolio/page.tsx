@@ -155,7 +155,7 @@ export default function PortfolioPage() {
                 إِنَّ اللَّهَ يُحِبُّ إِذَا عَمِلَ أَحَدُكُمْ عَمَلاً أَن يُتْقِنَهُ
               </div>
               <p className="text-white/25 text-xs text-center italic">
-                "Indeed Allah loves that when one of you does a deed, he perfects it." — Prophet Muhammad ﷺ
+                &ldquo;Indeed Allah loves that when one of you does a deed, he perfects it.&rdquo; — Prophet Muhammad ﷺ
               </p>
             </div>
           </div>

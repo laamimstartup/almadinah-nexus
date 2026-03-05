@@ -2,11 +2,10 @@
 import { motion } from "framer-motion";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 import ProgressBar from "@/components/ui/ProgressBar";
-import GlassCard from "@/components/ui/GlassCard";
 import Badge from "@/components/ui/Badge";
 import Link from "next/link";
 import {
-  Target, Star, Brain, Heart, Trophy, Flame, TrendingUp,
+  Target, Star, Brain, Heart, Trophy, TrendingUp,
   BookOpen, Clock, ChevronRight, Zap, CheckCircle2, Circle
 } from "lucide-react";
 
