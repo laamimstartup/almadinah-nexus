@@ -1,24 +1,200 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Amiri:ital,wght@0,400;0,700;1,400&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --font-instrument: 'Instrument Sans', sans-serif;
+  --font-playfair: 'Playfair Display', serif;
+  --font-arabic: 'Amiri', serif;
+
+  --gold: #C9A84C;
+  --gold-light: #fbbf24;
+  --emerald: #10b981;
+  --emerald-dark: #059669;
+  --bg-dark: #0A0E1A;
+  --surface: #111827;
+  --card: #161D2F;
+  --border: #1E2A42;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #0A0E1A;
+  color: #f9fafb;
+  font-family: var(--font-instrument), 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0A0E1A;
+}
+::-webkit-scrollbar-thumb {
+  background: #1E2A42;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #C9A84C;
+}
+
+/* Glass morphism utility */
+.glass {
+  background: rgba(22, 29, 47, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(201, 168, 76, 0.1);
+}
+
+.glass-light {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Gold gradient text */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #C9A84C 0%, #fbbf24 50%, #C9A84C 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-emerald-gradient {
+  background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Geometric mashrabiya overlay */
+.mashrabiya-overlay {
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23C9A84C' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Star/constellation field */
+.stars-bg {
+  background-image: 
+    radial-gradient(1px 1px at 10% 20%, rgba(201,168,76,0.6) 0%, transparent 100%),
+    radial-gradient(1px 1px at 80% 10%, rgba(255,255,255,0.4) 0%, transparent 100%),
+    radial-gradient(1px 1px at 50% 60%, rgba(201,168,76,0.4) 0%, transparent 100%),
+    radial-gradient(1px 1px at 30% 80%, rgba(255,255,255,0.3) 0%, transparent 100%),
+    radial-gradient(1px 1px at 70% 40%, rgba(16,185,129,0.4) 0%, transparent 100%),
+    radial-gradient(2px 2px at 90% 70%, rgba(201,168,76,0.3) 0%, transparent 100%),
+    radial-gradient(1px 1px at 15% 50%, rgba(255,255,255,0.5) 0%, transparent 100%);
+}
+
+/* Shimmer loading effect */
+.shimmer-effect {
+  background: linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.1) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+
+/* Card hover lift */
+.card-lift {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.card-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 30px rgba(201,168,76,0.1);
+}
+
+/* Gold border glow on focus */
+.gold-focus:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(201,168,76,0.5);
+}
+
+/* Animated gradient border */
+.gradient-border {
+  position: relative;
+}
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #C9A84C, #10b981, #C9A84C);
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.gradient-border:hover::before {
+  opacity: 1;
+}
+
+/* Progress bar gold */
+.progress-gold::-webkit-progress-value {
+  background: linear-gradient(90deg, #C9A84C, #fbbf24);
+}
+
+/* Hexagon badge */
+.hexagon {
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+
+/* Geometric divider */
+.geo-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, #C9A84C 50%, transparent 100%);
+  opacity: 0.3;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+}
+
+@keyframes fadeInUp {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes slideInRight {
+  0% { opacity: 0; transform: translateX(20px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes constellation {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+@keyframes pulseGold {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201,168,76,0.4); }
+  50% { box-shadow: 0 0 0 10px rgba(201,168,76,0); }
+}
+
+.animate-fade-in-up { animation: fadeInUp 0.6s ease-out both; }
+.animate-fade-in { animation: fadeIn 0.4s ease-out both; }
+.animate-slide-in-right { animation: slideInRight 0.5s ease-out both; }
+.animate-float { animation: float 6s ease-in-out infinite; }
+.animate-pulse-gold { animation: pulseGold 2s infinite; }
+
 
 @layer utilities {
   .text-balance {
