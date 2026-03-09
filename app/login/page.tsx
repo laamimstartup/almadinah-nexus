@@ -6,23 +6,34 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff, ArrowRight, Sparkles, Shield, GraduationCap, Users, BarChart3, AlertCircle } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { useAuth, UserRole } from "@/lib/auth-context";
+import { getUserDoc } from "@/lib/db/hooks";
 
 const roles = [
-  { id: "student", label: "Student", arabic: "الطَّالِب", icon: GraduationCap, color: "gold", href: "/dashboard/student" },
-  { id: "parent", label: "Parent", arabic: "الْوَالِدَيْن", icon: Users, color: "emerald", href: "/dashboard/parent" },
-  { id: "educator", label: "Educator", arabic: "الْمُعَلِّم", icon: BarChart3, color: "blue", href: "/dashboard/educator" },
+  { id: "student",  label: "Student",  arabic: "الطَّالِب",    icon: GraduationCap, color: "gold",    href: "/dashboard/student" },
+  { id: "parent",   label: "Parent",   arabic: "الْوَالِدَيْن", icon: Users,         color: "emerald", href: "/dashboard/parent" },
+  { id: "educator", label: "Educator", arabic: "الْمُعَلِّم",   icon: BarChart3,     color: "blue",    href: "/dashboard/educator" },
+  { id: "admin",    label: "Admin",    arabic: "الْإِدَارَة",   icon: Shield,        color: "purple",  href: "/dashboard/admin" },
 ];
+
+const ROLE_HREF: Record<string, string> = {
+  student:  "/dashboard/student",
+  parent:   "/dashboard/parent",
+  educator: "/dashboard/educator",
+  admin:    "/dashboard/admin",
+};
 
 const colorMap: Record<string, { border: string; bg: string; text: string; icon: string }> = {
   gold:    { border: "border-gold-500/40",    bg: "bg-gold-500/10",    text: "text-gold-400",    icon: "from-gold-600 to-gold-400" },
   emerald: { border: "border-emerald-500/40", bg: "bg-emerald-500/10", text: "text-emerald-400", icon: "from-emerald-700 to-emerald-400" },
   blue:    { border: "border-blue-500/40",    bg: "bg-blue-500/10",    text: "text-blue-400",    icon: "from-blue-700 to-blue-400" },
+  purple:  { border: "border-purple-500/40",  bg: "bg-purple-500/10",  text: "text-purple-400",  icon: "from-purple-700 to-purple-400" },
 };
 
 const greetings: Record<string, string> = {
-  student: `You are 4 steps away from your weekly Leadership Goal. Ready to lead?`,
-  parent: `Your child had an excellent week. 3 new Leadership Points earned.`,
+  student:  `You are 4 steps away from your weekly Leadership Goal. Ready to lead?`,
+  parent:   `Your child had an excellent week. 3 new Leadership Points earned.`,
   educator: `2 students need your attention today. Let's make a difference.`,
+  admin:    `Welcome back. Your school dashboard is ready. Barak Allahu Feek.`,
 };
 
 type AuthMode = "signin" | "signup";
@@ -58,21 +69,28 @@ export default function LoginPage() {
     return map[code] ?? "Something went wrong. Please try again.";
   };
 
+  const redirectByRole = async (uid: string, fallbackRole: string) => {
+    try {
+      const userDoc = await getUserDoc(uid);
+      const role = userDoc?.role ?? fallbackRole;
+      router.push(ROLE_HREF[role] ?? ROLE_HREF.student);
+    } catch {
+      router.push(ROLE_HREF[fallbackRole] ?? ROLE_HREF.student);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      if (mode === "signup") {
-        await signUp(email, password, name, selectedRole as UserRole);
-      } else {
-        await signIn(email, password);
-      }
-      const displayName = name || email.split("@")[0];
-      setGreetName(displayName);
+      const uid = mode === "signup"
+        ? await signUp(email, password, name, selectedRole as UserRole)
+        : await signIn(email, password);
+      setGreetName(name || email.split("@")[0]);
       setGreeting(true);
-      await new Promise((res) => setTimeout(res, 2000));
-      router.push(currentRole.href);
+      await new Promise((res) => setTimeout(res, 1800));
+      await redirectByRole(uid, selectedRole);
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? "";
       setError(friendlyError(code));
@@ -84,11 +102,11 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      await signInWithGoogle(selectedRole as UserRole);
+      const uid = await signInWithGoogle(selectedRole as UserRole);
       setGreetName("");
       setGreeting(true);
-      await new Promise((res) => setTimeout(res, 2000));
-      router.push(currentRole.href);
+      await new Promise((res) => setTimeout(res, 1800));
+      await redirectByRole(uid, selectedRole);
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? "";
       setError(friendlyError(code));
@@ -209,7 +227,7 @@ export default function LoginPage() {
           {/* Role selector */}
           <div className="mb-6">
             <p className="text-white/50 text-xs font-medium uppercase tracking-widest mb-3">I am a</p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {roles.map((role) => {
                 const Icon = role.icon;
                 const rc = colorMap[role.color];

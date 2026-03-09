@@ -14,7 +14,7 @@ import {
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "./firebase";
 
-export type UserRole = "student" | "parent" | "educator";
+export type UserRole = "student" | "parent" | "educator" | "admin";
 
 export interface NexusUser {
   uid: string;
@@ -28,9 +28,9 @@ interface AuthContextValue {
   user: NexusUser | null;
   firebaseUser: User | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
-  signInWithGoogle: (role: UserRole) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<string>;
+  signUp: (email: string, password: string, name: string, role: UserRole) => Promise<string>;
+  signInWithGoogle: (role: UserRole) => Promise<string>;
   logOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
 }
@@ -74,11 +74,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return unsub;
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+  const signIn = async (email: string, password: string): Promise<string> => {
+    const { user: fbUser } = await signInWithEmailAndPassword(auth, email, password);
+    return fbUser.uid;
   };
 
-  const signUp = async (email: string, password: string, name: string, role: UserRole) => {
+  const signUp = async (email: string, password: string, name: string, role: UserRole): Promise<string> => {
     const { user: fbUser } = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(fbUser, { displayName: name });
     await setDoc(doc(db, "users", fbUser.uid), {
@@ -86,11 +87,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       displayName: name,
       role,
+      schoolId:    "almadinah-queens",
+      isActive:    true,
       createdAt:   serverTimestamp(),
+      updatedAt:   serverTimestamp(),
     });
+    return fbUser.uid;
   };
 
-  const signInWithGoogle = async (role: UserRole) => {
+  const signInWithGoogle = async (role: UserRole): Promise<string> => {
     const provider = new GoogleAuthProvider();
     const { user: fbUser } = await signInWithPopup(auth, provider);
     const snap = await getDoc(doc(db, "users", fbUser.uid));
@@ -100,9 +105,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email:       fbUser.email,
         displayName: fbUser.displayName,
         role,
+        schoolId:    "almadinah-queens",
+        isActive:    true,
         createdAt:   serverTimestamp(),
+        updatedAt:   serverTimestamp(),
       });
     }
+    return fbUser.uid;
   };
 
   const logOut = async () => {
