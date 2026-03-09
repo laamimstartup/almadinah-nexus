@@ -5,56 +5,101 @@ service cloud.firestore {
     // ── helpers ──────────────────────────────────────────────────────────────
     function isAuth() { return request.auth != null; }
     function isOwner(uid) { return isAuth() && request.auth.uid == uid; }
-    function getRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    function getUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
-    function isStudent()  { return isAuth() && getRole() == "student"; }
-    function isParent()   { return isAuth() && getRole() == "parent"; }
+    function getRole() { return getUser().role; }
+    function isAdmin()    { return isAuth() && getRole() == "admin"; }
     function isEducator() { return isAuth() && getRole() == "educator"; }
+    function isParent()   { return isAuth() && getRole() == "parent"; }
+    function isStudent()  { return isAuth() && getRole() == "student"; }
     function isStaff()    { return isAuth() && (getRole() == "educator" || getRole() == "admin"); }
 
-    // Child linked to parent
+    // Parent linked to child — supports childUids array (multi-child families)
     function isMyChild(studentUid) {
       return isParent() &&
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.childUid == studentUid;
+        (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get("childUids", []).hasAny([studentUid]) ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get("childUid", "") == studentUid
+        );
     }
 
     // Student belongs to educator's class
     function isMyStudent(studentUid) {
       return isStaff() &&
         exists(/databases/$(database)/documents/studentProfiles/$(studentUid)) &&
-        get(/databases/$(database)/documents/studentProfiles/$(studentUid)).data.educatorUid == request.auth.uid;
+        (
+          get(/databases/$(database)/documents/studentProfiles/$(studentUid)).data.get("leadEducatorUid", "") == request.auth.uid ||
+          get(/databases/$(database)/documents/studentProfiles/$(studentUid)).data.get("educatorUid", "") == request.auth.uid
+        );
+    }
+
+    // Same school check
+    function sameSchool(schoolId) {
+      return isAuth() && getUser().get("schoolId", "") == schoolId;
     }
 
     // ── users ─────────────────────────────────────────────────────────────────
     match /users/{uid} {
-      allow read:   if isOwner(uid) || isStaff() || isMyChild(uid);
-      allow create: if isOwner(uid);
-      allow update: if isOwner(uid) || isStaff();
+      allow read:   if isOwner(uid) || isStaff();
+      allow create: if isOwner(uid) || isAdmin();
+      allow update: if isOwner(uid) || isAdmin();
+      allow delete: if isAdmin();
     }
 
     // ── schools ───────────────────────────────────────────────────────────────
     match /schools/{schoolId} {
       allow read:  if isAuth();
-      allow write: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // ── academicYears ─────────────────────────────────────────────────────────
+    match /academicYears/{yearId} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // ── adminSettings ─────────────────────────────────────────────────────────
+    match /adminSettings/{schoolId} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
     }
 
     // ── classes ───────────────────────────────────────────────────────────────
     match /classes/{classId} {
       allow read:  if isAuth();
-      allow write: if isStaff();
-
-      match /students/{studentUid} {
-        allow read:  if isAuth();
-        allow write: if isStaff();
-      }
+      allow create: if isAdmin();
+      allow update: if isAdmin() || isEducator();
+      allow delete: if isAdmin();
     }
 
-    // ── missions (templates) ──────────────────────────────────────────────────
+    // ── enrollments ───────────────────────────────────────────────────────────
+    match /enrollments/{enrollmentId} {
+      allow read:  if isStaff() ||
+        isMyChild(resource.data.studentUid) ||
+        resource.data.studentUid == request.auth.uid;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── staff ─────────────────────────────────────────────────────────────────
+    match /staff/{staffId} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // ── missions ─────────────────────────────────────────────────────────────
     match /missions/{missionId} {
       allow read:  if isAuth();
       allow write: if isStaff();
+    }
+
+    // ── missionTemplates ─────────────────────────────────────────────────────
+    match /missionTemplates/{templateId} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
     }
 
     // ── studentProfiles ───────────────────────────────────────────────────────
@@ -62,32 +107,40 @@ service cloud.firestore {
       allow read:  if isOwner(studentUid) || isMyChild(studentUid) || isMyStudent(studentUid) || isStaff();
       allow write: if isOwner(studentUid) || isStaff();
 
-      // Mission progress — student writes own, educator can read all
       match /missionProgress/{missionId} {
         allow read:  if isOwner(studentUid) || isMyChild(studentUid) || isMyStudent(studentUid);
         allow write: if isOwner(studentUid) || isStaff();
       }
 
-      // Tarbiyah daily check-ins — private to student, readable by parent/educator
       match /tarbiyah/{date} {
         allow read:  if isOwner(studentUid) || isMyChild(studentUid) || isMyStudent(studentUid);
         allow write: if isOwner(studentUid);
       }
 
-      // AI chat sessions — private
       match /aiSessions/{sessionId} {
         allow read:  if isOwner(studentUid) || isStaff();
         allow write: if isOwner(studentUid);
       }
 
-      // Weekly goals
       match /weeklyGoals/{weekId} {
         allow read:  if isOwner(studentUid) || isMyChild(studentUid) || isMyStudent(studentUid);
         allow write: if isOwner(studentUid) || isStaff();
       }
     }
 
-    // ── attendance ────────────────────────────────────────────────────────────
+    // ── attendanceDays (new class-scoped schema) ──────────────────────────────
+    match /attendanceDays/{dayId} {
+      allow read:  if isAuth() && (
+        isStaff() ||
+        resource.data.studentUids.hasAny([request.auth.uid]) ||
+        isMyChild(resource.data.get("submittedBy", ""))
+      );
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
+    // ── attendance (legacy flat collection — keep for backwards compat) ────────
     match /attendance/{recordId} {
       allow read:  if isAuth() && (
         isStaff() ||
@@ -100,6 +153,7 @@ service cloud.firestore {
     // ── activityFeed ──────────────────────────────────────────────────────────
     match /activityFeed/{feedId} {
       allow read: if isAuth() && (
+        isAdmin() ||
         resource.data.studentUid == request.auth.uid ||
         isMyChild(resource.data.studentUid) ||
         isMyStudent(resource.data.studentUid)
@@ -108,12 +162,43 @@ service cloud.firestore {
       allow update, delete: if isStaff();
     }
 
+    // ── announcements ─────────────────────────────────────────────────────────
+    match /announcements/{announcementId} {
+      allow read:  if isAuth();
+      allow create: if isStaff();
+      allow update: if isAdmin() || (isEducator() && resource.data.authorUid == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    // ── events ────────────────────────────────────────────────────────────────
+    match /events/{eventId} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // ── programs ─────────────────────────────────────────────────────────────
+    match /programs/{programId} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // ── subjects ─────────────────────────────────────────────────────────────
+    match /subjects/{subjectId} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // ── curriculumUnits ───────────────────────────────────────────────────────
+    match /curriculumUnits/{unitId} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
     // ── messages ──────────────────────────────────────────────────────────────
     match /messages/{threadId} {
-      allow read, write: if isAuth() && (
-        request.auth.uid in resource.data.participantUids
-      );
+      allow read:   if isAuth() && request.auth.uid in resource.data.participantUids;
       allow create: if isAuth();
+      allow update: if isAuth() && request.auth.uid in resource.data.participantUids;
 
       match /messages/{msgId} {
         allow read:   if isAuth();

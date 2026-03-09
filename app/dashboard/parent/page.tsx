@@ -73,7 +73,7 @@ export default function ParentDashboard() {
 
   const childName     = childProfile?.displayName ?? "Your Child";
   const grade         = childProfile?.grade ? `Grade ${childProfile.grade}` : "Grade 7";
-  const teacher       = childProfile?.educatorName ?? "Ustadh Yusuf Khalid";
+  const teacher       = childProfile?.leadEducatorName ?? "Ustadh Yusuf Khalid";
   const attendance    = childProfile?.attendancePct ?? 96;
   const leadershipPts = childProfile?.leadershipPts ?? 0;
   const tarbiyahScore = childProfile?.tarbiyahScore ?? 0;

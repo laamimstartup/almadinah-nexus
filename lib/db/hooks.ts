@@ -8,9 +8,11 @@ import {
 import { db } from "@/lib/firebase";
 import type {
   StudentProfileDoc, MissionDoc, MissionProgressDoc,
-  TarbiyahDayDoc, ActivityFeedDoc, AttendanceDoc,
+  TarbiyahDayDoc, ActivityFeedDoc, AttendanceDayDoc,
   ClassDoc, UserDoc, WeeklyGoal, TaskProgress,
   ProgramDoc, SubjectDoc, CurriculumUnit,
+  EnrollmentDoc, StaffDoc, AcademicYearDoc,
+  SchoolDoc, AnnouncementDoc, EventDoc,
 } from "./types";
 
 // ─── helpers ──────────────────────────────────────────────────────────────
@@ -164,21 +166,29 @@ export function useClassStudents(classId: string | null) {
   return { students, loading };
 }
 
-// ─── useAttendance (student, last 30 records) ────────────────────────────
+// ─── useAttendance (student attendance, last 30 records by studentUid) ────
 export function useAttendance(studentUid: string | null) {
-  const [records, setRecords] = useState<(AttendanceDoc & { id: string })[]>([]);
+  const [records, setRecords] = useState<{ id: string; date: string; status: string; classId: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!studentUid) { setLoading(false); return; }
+    // New schema: query attendanceDays where records map contains this student
+    // For compatibility, also query old flat collection
     const q = query(
-      collection(db, "attendance"),
-      where("studentUid", "==", studentUid),
+      collection(db, "attendanceDays"),
+      where("studentUids", "array-contains", studentUid),
       orderBy("date", "desc"),
       limit(30)
     );
     const unsub = onSnapshot(q, (snap) => {
-      setRecords(snap.docs.map((d) => ({ id: d.id, ...d.data() } as AttendanceDoc & { id: string })));
+      const flat = snap.docs.flatMap((d) => {
+        const data = d.data() as AttendanceDayDoc;
+        const rec = data.records?.[studentUid];
+        if (!rec) return [];
+        return [{ id: d.id, date: data.date, status: rec.status, classId: data.classId }];
+      });
+      setRecords(flat);
       setLoading(false);
     });
     return unsub;
@@ -481,6 +491,201 @@ export function useMissionsBySubject(subjectId: string | null, classId: string |
   }, [subjectId, classId]);
 
   return { missions, loading };
+}
+
+// ─── ADMIN HOOKS ──────────────────────────────────────────────────────────
+
+// useSchool — live school doc
+export function useSchool(schoolId: string | null) {
+  const [school, setSchool] = useState<SchoolDoc | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!schoolId) { setLoading(false); return; }
+    return onSnapshot(doc(db, "schools", schoolId), (snap) => {
+      setSchool(snap.exists() ? ({ id: snap.id, ...snap.data() } as SchoolDoc) : null);
+      setLoading(false);
+    });
+  }, [schoolId]);
+  return { school, loading };
+}
+
+// useAcademicYear — live current academic year
+export function useAcademicYear(yearId: string | null) {
+  const [year, setYear] = useState<AcademicYearDoc | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!yearId) { setLoading(false); return; }
+    return onSnapshot(doc(db, "academicYears", yearId), (snap) => {
+      setYear(snap.exists() ? ({ id: snap.id, ...snap.data() } as AcademicYearDoc) : null);
+      setLoading(false);
+    });
+  }, [yearId]);
+  return { year, loading };
+}
+
+// useAllStudents — all student profiles for a school
+export function useAllStudents(schoolId: string | null) {
+  const [students, setStudents] = useState<(StudentProfileDoc & { uid: string })[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!schoolId) { setLoading(false); return; }
+    const q = query(
+      collection(db, "studentProfiles"),
+      where("schoolId", "==", schoolId),
+      orderBy("displayName", "asc")
+    );
+    return onSnapshot(q, (snap) => {
+      setStudents(snap.docs.map((d) => ({ uid: d.id, ...d.data() } as StudentProfileDoc & { uid: string })));
+      setLoading(false);
+    });
+  }, [schoolId]);
+  return { students, loading };
+}
+
+// useAllClasses — all classes for a school + academic year
+export function useAllClasses(schoolId: string | null, academicYear?: string) {
+  const [classes, setClasses] = useState<(ClassDoc & { id: string })[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!schoolId) { setLoading(false); return; }
+    const constraints = [where("schoolId", "==", schoolId)];
+    if (academicYear) constraints.push(where("academicYear", "==", academicYear));
+    const q = query(collection(db, "classes"), ...constraints, orderBy("gradeLevel", "asc"));
+    return onSnapshot(q, (snap) => {
+      setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDoc & { id: string })));
+      setLoading(false);
+    });
+  }, [schoolId, academicYear]);
+  return { classes, loading };
+}
+
+// useAllStaff — all staff for a school
+export function useAllStaff(schoolId: string | null) {
+  const [staff, setStaff] = useState<(StaffDoc & { id: string })[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!schoolId) { setLoading(false); return; }
+    const q = query(
+      collection(db, "staff"),
+      where("schoolId", "==", schoolId),
+      where("isActive", "==", true),
+      orderBy("role", "asc")
+    );
+    return onSnapshot(q, (snap) => {
+      setStaff(snap.docs.map((d) => ({ id: d.id, ...d.data() } as StaffDoc & { id: string })));
+      setLoading(false);
+    });
+  }, [schoolId]);
+  return { staff, loading };
+}
+
+// useEnrollments — all enrollments for a school + academic year
+export function useEnrollments(schoolId: string | null, academicYear?: string) {
+  const [enrollments, setEnrollments] = useState<(EnrollmentDoc & { id: string })[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!schoolId) { setLoading(false); return; }
+    const constraints = [where("schoolId", "==", schoolId)];
+    if (academicYear) constraints.push(where("academicYear", "==", academicYear));
+    const q = query(collection(db, "enrollments"), ...constraints, orderBy("createdAt", "desc"));
+    return onSnapshot(q, (snap) => {
+      setEnrollments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as EnrollmentDoc & { id: string })));
+      setLoading(false);
+    });
+  }, [schoolId, academicYear]);
+  return { enrollments, loading };
+}
+
+// useAnnouncements — school-wide or class-specific announcements
+export function useAnnouncements(schoolId: string | null, classId?: string) {
+  const [announcements, setAnnouncements] = useState<(AnnouncementDoc & { id: string })[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!schoolId) { setLoading(false); return; }
+    const constraints = [where("schoolId", "==", schoolId)];
+    if (classId) constraints.push(where("classId", "==", classId));
+    const q = query(collection(db, "announcements"), ...constraints, orderBy("createdAt", "desc"), limit(20));
+    return onSnapshot(q, (snap) => {
+      setAnnouncements(snap.docs.map((d) => ({ id: d.id, ...d.data() } as AnnouncementDoc & { id: string })));
+      setLoading(false);
+    });
+  }, [schoolId, classId]);
+  return { announcements, loading };
+}
+
+// useEvents — upcoming school events
+export function useEvents(schoolId: string | null) {
+  const [events, setEvents] = useState<(EventDoc & { id: string })[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!schoolId) { setLoading(false); return; }
+    const q = query(
+      collection(db, "events"),
+      where("schoolId", "==", schoolId),
+      orderBy("startDate", "asc"),
+      limit(20)
+    );
+    return onSnapshot(q, (snap) => {
+      setEvents(snap.docs.map((d) => ({ id: d.id, ...d.data() } as EventDoc & { id: string })));
+      setLoading(false);
+    });
+  }, [schoolId]);
+  return { events, loading };
+}
+
+// ─── ADMIN MUTATIONS ──────────────────────────────────────────────────────
+
+// createClass — admin creates a new class
+export async function createClass(data: Omit<ClassDoc, "id" | "createdAt" | "updatedAt" | "studentUids">) {
+  const ref = await addDoc(collection(db, "classes"), {
+    ...data,
+    studentUids: [],
+    isActive: true,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+// updateEnrollmentStatus — admin changes enrollment status
+export async function updateEnrollmentStatus(
+  enrollmentId: string,
+  status: string,
+  adminUid: string
+) {
+  await updateDoc(doc(db, "enrollments", enrollmentId), {
+    status,
+    updatedAt: serverTimestamp(),
+    [`statusHistory.${Date.now()}`]: { status, changedBy: adminUid, at: serverTimestamp() },
+  });
+}
+
+// createEnrollment — admin enrolls a student in a class
+export async function createEnrollment(data: Omit<EnrollmentDoc, "id" | "createdAt" | "updatedAt">) {
+  const ref = await addDoc(collection(db, "enrollments"), {
+    ...data,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  // Add student to class roster
+  const classRef = doc(db, "classes", data.classId);
+  const classSnap = await getDoc(classRef);
+  if (classSnap.exists()) {
+    const current: string[] = classSnap.data().studentUids ?? [];
+    if (!current.includes(data.studentUid)) {
+      await updateDoc(classRef, { studentUids: [...current, data.studentUid], updatedAt: serverTimestamp() });
+    }
+  }
+  return ref.id;
+}
+
+// createAnnouncement — admin/educator creates announcement
+export async function createAnnouncement(data: Omit<AnnouncementDoc, "id" | "createdAt">) {
+  const ref = await addDoc(collection(db, "announcements"), {
+    ...data,
+    createdAt: serverTimestamp(),
+  });
+  return ref.id;
 }
 
 // Ensure today's tarbiyah doc exists (create skeleton if missing)

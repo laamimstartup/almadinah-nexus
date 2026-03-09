@@ -5,7 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Target, Star, BookOpen, Brain, Trophy, Users, BarChart3,
-  Bell, Settings, LogOut, Menu, ChevronRight, Zap, Heart
+  Bell, Settings, LogOut, Menu, ChevronRight, Zap, Heart,
+  Shield, GraduationCap, CalendarDays, Megaphone, UserPlus
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -19,7 +20,7 @@ interface NavItem {
 
 interface DashboardShellProps {
   children: React.ReactNode;
-  role: "student" | "parent" | "educator";
+  role: "student" | "parent" | "educator" | "admin";
   userName: string;
   userInitial: string;
   subtitle?: string;
@@ -52,12 +53,25 @@ const educatorNav: NavItem[] = [
   { label: "Messages",     icon: Target,           href: "/dashboard/educator/messages", badge: "5" },
 ];
 
-const navByRole = { student: studentNav, parent: parentNav, educator: educatorNav };
+const adminNav: NavItem[] = [
+  { label: "Overview",     icon: LayoutDashboard, href: "/dashboard/admin" },
+  { label: "Students",     icon: GraduationCap,   href: "/dashboard/admin/students" },
+  { label: "Classes",      icon: BookOpen,        href: "/dashboard/admin/classes" },
+  { label: "Staff",        icon: Users,           href: "/dashboard/admin/staff" },
+  { label: "Enrollment",   icon: UserPlus,        href: "/dashboard/admin/enrollment" },
+  { label: "Programs",     icon: Star,            href: "/dashboard/admin/programs" },
+  { label: "Announcements",icon: Megaphone,       href: "/dashboard/admin/announcements" },
+  { label: "Calendar",     icon: CalendarDays,    href: "/dashboard/admin/calendar" },
+  { label: "Settings",     icon: Shield,          href: "/dashboard/admin/settings" },
+];
+
+const navByRole = { student: studentNav, parent: parentNav, educator: educatorNav, admin: adminNav };
 
 const roleColors = {
   student:  { accent: "text-gold-400",    border: "border-gold-500/20",    bg: "bg-gold-500/10",    gradient: "from-gold-600 to-gold-400" },
   parent:   { accent: "text-emerald-400", border: "border-emerald-500/20", bg: "bg-emerald-500/10", gradient: "from-emerald-700 to-emerald-400" },
   educator: { accent: "text-blue-400",    border: "border-blue-500/20",    bg: "bg-blue-500/10",    gradient: "from-blue-700 to-blue-400" },
+  admin:    { accent: "text-purple-400",  border: "border-purple-500/20",  bg: "bg-purple-500/10",  gradient: "from-purple-700 to-purple-400" },
 };
 
 export default function DashboardShell({ children, role, userName, userInitial, subtitle }: DashboardShellProps) {
