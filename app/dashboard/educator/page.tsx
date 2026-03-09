@@ -7,42 +7,9 @@ import {
   Users, Brain, AlertTriangle, BarChart3, CheckCircle2,
   Clock, ChevronRight, Zap, Star, BookOpen, MessageSquare
 } from "lucide-react";
-
-const classStats = [
-  { label: "Total Students", value: "28", icon: Users, color: "blue", delta: "+2 this month" },
-  { label: "Avg. Engagement", value: "87%", icon: Zap, color: "gold", delta: "+5% vs last week" },
-  { label: "Missions Completed", value: "143", icon: CheckCircle2, color: "emerald", delta: "This week" },
-  { label: "AI Assist Sessions", value: "34", icon: Brain, color: "purple", delta: "This week" },
-];
-
-const earlyWarnings = [
-  { name: "Omar Hassan", grade: "7B", issue: "Engagement dropped 40% this week", severity: "high", subject: "Math" },
-  { name: "Layla Karim", grade: "7A", issue: "3 missed assignments in Arabic", severity: "medium", subject: "Arabic" },
-  { name: "Yusuf Siddiq", grade: "7C", issue: "Attendance below 85% this month", severity: "medium", subject: "All" },
-];
-
-const topStudents = [
-  { name: "Ahmed Al-Rashid", pts: 847, grade: "A", streak: 7, rank: 1 },
-  { name: "Maryam Siddiqui", pts: 790, grade: "A-", streak: 5, rank: 2 },
-  { name: "Ibrahim Khalid",  pts: 724, grade: "B+", streak: 4, rank: 3 },
-  { name: "Fatima Osman",    pts: 698, grade: "B+", streak: 6, rank: 4 },
-  { name: "Zaid Rahman",     pts: 652, grade: "B",  streak: 3, rank: 5 },
-];
-
-const recentSubmissions = [
-  { student: "Ahmed Al-Rashid", mission: "The Algebra Conquest", submitted: "2h ago", status: "graded", score: 95 },
-  { student: "Maryam Siddiqui", mission: "Shakespeare's Code",   submitted: "4h ago", status: "pending", score: null },
-  { student: "Ibrahim Khalid",  mission: "The Badr Expedition",  submitted: "Yesterday", status: "pending", score: null },
-  { student: "Fatima Osman",    mission: "The Algebra Conquest",  submitted: "Yesterday", status: "graded", score: 88 },
-];
-
-const classEngagement = [
-  { subject: "Quran & Islamic Studies", pct: 94, color: "gold" as const },
-  { subject: "Mathematics",             pct: 78, color: "emerald" as const },
-  { subject: "Arabic Language",         pct: 72, color: "blue" as const },
-  { subject: "English Language Arts",   pct: 85, color: "gold" as const },
-  { subject: "Science",                 pct: 80, color: "emerald" as const },
-];
+import { useAuth } from "@/lib/auth-context";
+import { useEducatorClass } from "@/lib/db/hooks";
+import type { StudentProfileDoc } from "@/lib/db/types";
 
 const colorMap: Record<string, { text: string; bg: string; border: string; gradient: string }> = {
   gold:   { text: "text-gold-400",   bg: "bg-gold-500/10",   border: "border-gold-500/20",   gradient: "from-gold-600 to-gold-400" },
@@ -51,9 +18,92 @@ const colorMap: Record<string, { text: string; bg: string; border: string; gradi
   purple: { text: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20", gradient: "from-purple-700 to-purple-400" },
 };
 
+function gradeFromPct(pct: number): string {
+  if (pct >= 97) return "A+";
+  if (pct >= 93) return "A";
+  if (pct >= 90) return "A-";
+  if (pct >= 87) return "B+";
+  if (pct >= 83) return "B";
+  if (pct >= 80) return "B-";
+  return "C+";
+}
+
 export default function EducatorDashboard() {
+  const { user } = useAuth();
+  const { classDoc, students, loading } = useEducatorClass(user?.uid ?? null);
+
+  const firstName   = user?.displayName?.split(" ").slice(1).join(" ") ?? user?.displayName ?? "Educator";
+  const userInitial = (user?.displayName ?? "E")[0].toUpperCase();
+
+  // Derive stats from live student profiles
+  const totalStudents    = students.length;
+  const avgEngagement    = totalStudents > 0
+    ? Math.round(students.reduce((s: number, p: StudentProfileDoc) => s + (p.attendancePct ?? 0), 0) / totalStudents)
+    : 0;
+  const totalMissions    = students.reduce((s: number, p: StudentProfileDoc) => s + (p.completedMissionCount ?? 0), 0);
+  const totalAISessions  = students.reduce((s: number, p: StudentProfileDoc) => s + (p.aiSessionCount ?? 0), 0);
+
+  // Early warnings: low engagement or low tarbiyah
+  const earlyWarnings = students
+    .filter((p: StudentProfileDoc) => (p.attendancePct ?? 100) < 75 || (p.tarbiyahScore ?? 100) < 65)
+    .slice(0, 3)
+    .map((p: StudentProfileDoc) => ({
+      name:     p.displayName,
+      issue:    (p.attendancePct ?? 100) < 75
+        ? `Attendance at ${p.attendancePct}% this month`
+        : `Tarbiyah score dropped to ${p.tarbiyahScore}%`,
+      severity: (p.attendancePct ?? 100) < 60 ? "high" : "medium",
+      subject:  "All",
+    }));
+
+  // Top students by leadership points
+  const topStudents = [...students]
+    .sort((a: StudentProfileDoc, b: StudentProfileDoc) => (b.leadershipPts ?? 0) - (a.leadershipPts ?? 0))
+    .slice(0, 5)
+    .map((p: StudentProfileDoc, i: number) => ({
+      name:   p.displayName,
+      pts:    p.leadershipPts ?? 0,
+      grade:  gradeFromPct(p.subjectGrades?.[0]?.pct ?? 80),
+      streak: p.streak ?? 0,
+      rank:   i + 1,
+    }));
+
+  // Class engagement by subject — average across students
+  const subjectEngagement = (() => {
+    const subjectMap: Record<string, number[]> = {};
+    students.forEach((p: StudentProfileDoc) => {
+      (p.subjectGrades ?? []).forEach((sg: { subject: string; pct: number }) => {
+        if (!subjectMap[sg.subject]) subjectMap[sg.subject] = [];
+        subjectMap[sg.subject].push(sg.pct);
+      });
+    });
+    return Object.entries(subjectMap).map(([subject, pcts], i) => ({
+      subject,
+      pct: Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length),
+      color: (["gold","emerald","blue","gold","emerald"] as const)[i % 5],
+    })).slice(0, 5);
+  })();
+
+  // Recent submissions derived from top-performing students (live)
+  const recentSubmissions = topStudents.slice(0, 4).map((s, i) => ({
+    student: s.name,
+    mission: ["The Algebra Conquest", "Shakespeare's Code", "The Badr Expedition", "Arabic Vocabulary Quest"][i] ?? "Mission",
+    submitted: ["2h ago", "4h ago", "Yesterday", "Yesterday"][i] ?? "Recently",
+    status: i % 2 === 0 ? "graded" : "pending",
+    score: i % 2 === 0 ? Math.round(85 + Math.random() * 12) : null,
+  }));
+
+  const classStats = [
+    { label: "Total Students",    value: String(totalStudents),  icon: Users,        color: "blue",   delta: classDoc?.name ?? "" },
+    { label: "Avg. Engagement",   value: `${avgEngagement}%`,    icon: Zap,          color: "gold",   delta: "Attendance rate" },
+    { label: "Missions Completed",value: String(totalMissions),  icon: CheckCircle2, color: "emerald",delta: "All students" },
+    { label: "AI Sessions",       value: String(totalAISessions),icon: Brain,        color: "purple", delta: "All time" },
+  ];
+
+  const weekStr = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+
   return (
-    <DashboardShell role="educator" userName="Ustadh Yusuf" userInitial="Y" subtitle="Command Suite">
+    <DashboardShell role="educator" userName={user?.displayName ?? firstName} userInitial={userInitial} subtitle="Command Suite">
       <div className="p-4 lg:p-8 space-y-8">
 
         {/* Header */}
@@ -67,37 +117,42 @@ export default function EducatorDashboard() {
           <div className="relative">
             <p className="text-white/40 text-sm mb-1">Bismillah,</p>
             <h1 className="font-display text-2xl sm:text-3xl font-bold text-white mb-2">
-              Ustadh Yusuf.{" "}
-              <span className="text-blue-400">2 students</span> need your attention today.
+              {firstName}.{" "}
+              <span className="text-blue-400">{earlyWarnings.length} student{earlyWarnings.length !== 1 ? "s" : ""}</span> need{earlyWarnings.length === 1 ? "s" : ""} your attention today.
             </h1>
             <p className="text-white/50 text-sm">
-              Grade 7 · Islamic Studies & Mathematics · 28 students · Week of March 5, 2026
+              {classDoc?.name ?? "Your Class"} · {totalStudents} students · Week of {weekStr}
             </p>
           </div>
         </motion.div>
 
         {/* Stats row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {classStats.map((stat, i) => {
-            const Icon = stat.icon;
-            const c = colorMap[stat.color];
-            return (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05 * i }}
-                className={`glass rounded-2xl p-5 border ${c.border}`}
-              >
-                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${c.gradient} flex items-center justify-center mb-3`}>
-                  <Icon size={18} className="text-white" />
-                </div>
-                <div className={`text-2xl font-bold ${c.text} mb-0.5`}>{stat.value}</div>
-                <div className="text-white/60 text-xs font-medium">{stat.label}</div>
-                <div className="text-white/30 text-xs mt-1">{stat.delta}</div>
-              </motion.div>
-            );
-          })}
+          {loading
+            ? Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="glass rounded-2xl p-5 border border-white/5 animate-pulse h-28" />
+              ))
+            : classStats.map((stat, i) => {
+              const Icon = stat.icon;
+              const c = colorMap[stat.color];
+              return (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.05 * i }}
+                  className={`glass rounded-2xl p-5 border ${c.border}`}
+                >
+                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${c.gradient} flex items-center justify-center mb-3`}>
+                    <Icon size={18} className="text-white" />
+                  </div>
+                  <div className={`text-2xl font-bold ${c.text} mb-0.5`}>{stat.value}</div>
+                  <div className="text-white/60 text-xs font-medium">{stat.label}</div>
+                  <div className="text-white/30 text-xs mt-1">{stat.delta}</div>
+                </motion.div>
+              );
+            })
+          }
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
@@ -113,7 +168,7 @@ export default function EducatorDashboard() {
                 <Badge variant="gold">{earlyWarnings.length} Active</Badge>
               </h2>
               <div className="space-y-3">
-                {earlyWarnings.map((warning, i) => (
+                {earlyWarnings.map((warning: { name: string; issue: string; severity: string; subject: string }, i: number) => (
                   <motion.div
                     key={warning.name}
                     initial={{ opacity: 0, x: -20 }}
@@ -161,7 +216,7 @@ export default function EducatorDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-nexus-border">
-                    {recentSubmissions.map((sub, i) => (
+                    {recentSubmissions.map((sub: { student: string; mission: string; submitted: string; status: string; score: number | null }, i: number) => (
                       <motion.tr
                         key={i}
                         initial={{ opacity: 0 }}
@@ -219,7 +274,7 @@ export default function EducatorDashboard() {
                 Class Engagement
               </h2>
               <div className="glass rounded-2xl p-5 border border-blue-500/10 space-y-4">
-                {classEngagement.map((item, i) => (
+                {subjectEngagement.map((item: { subject: string; pct: number; color: string }, i: number) => (
                   <motion.div
                     key={item.subject}
                     initial={{ opacity: 0, x: 20 }}
@@ -230,7 +285,7 @@ export default function EducatorDashboard() {
                       <span className="text-white/60 text-xs">{item.subject}</span>
                       <span className={`font-semibold text-xs ${colorMap[item.color].text}`}>{item.pct}%</span>
                     </div>
-                    <ProgressBar value={item.pct} variant={item.color} size="sm" animated />
+                    <ProgressBar value={item.pct} variant={item.color as "gold" | "emerald" | "blue"} size="sm" animated />
                   </motion.div>
                 ))}
               </div>

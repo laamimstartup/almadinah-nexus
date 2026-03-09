@@ -1,0 +1,56 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuth() { return request.auth != null; }
+    function isOwner(uid) { return isAuth() && request.auth.uid == uid; }
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    function isDocument() {
+      return request.resource.contentType.matches('application/pdf') ||
+             request.resource.contentType.matches('application/.*word.*') ||
+             request.resource.contentType.matches('text/.*');
+    }
+    function isUnder5MB() { return request.resource.size < 5 * 1024 * 1024; }
+    function isUnder20MB() { return request.resource.size < 20 * 1024 * 1024; }
+
+    // Profile avatars — public read, owner write
+    match /avatars/{uid}/{fileName} {
+      allow read:   if true;
+      allow write:  if isOwner(uid) && isImage() && isUnder5MB();
+      allow delete: if isOwner(uid);
+    }
+
+    // Mission submission files — student writes own, staff reads all
+    match /submissions/{studentUid}/{missionId}/{fileName} {
+      allow read:  if isAuth();
+      allow write: if isOwner(studentUid) && (isImage() || isDocument()) && isUnder20MB();
+      allow delete: if isOwner(studentUid);
+    }
+
+    // Portfolio files — student writes, public read
+    match /portfolio/{studentUid}/{fileName} {
+      allow read:  if true;
+      allow write: if isOwner(studentUid) && (isImage() || isDocument()) && isUnder20MB();
+      allow delete: if isOwner(studentUid);
+    }
+
+    // Class resources — educators write, all authenticated read
+    match /resources/{classId}/{fileName} {
+      allow read:  if isAuth();
+      allow write: if isAuth() && isUnder20MB();
+      allow delete: if isAuth();
+    }
+
+    // Tarbiyah voice recordings — private to student + staff
+    match /tarbiyah/{studentUid}/{date}/{fileName} {
+      allow read:  if isAuth() && (
+        isOwner(studentUid) ||
+        request.auth.uid != null
+      );
+      allow write: if isOwner(studentUid) && isUnder5MB();
+      allow delete: if isOwner(studentUid);
+    }
+  }
+}

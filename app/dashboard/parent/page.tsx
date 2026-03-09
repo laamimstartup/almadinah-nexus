@@ -7,34 +7,10 @@ import {
   TrendingUp, Calendar, MessageSquare, Video, Star, Heart,
   CheckCircle2, AlertCircle, Clock, Zap, Bell, Globe
 } from "lucide-react";
-
-const childData = {
-  name: "Ahmed Al-Rashid",
-  grade: "Grade 7",
-  teacher: "Ustadh Yusuf Khalid",
-  attendance: 96,
-  overallGrade: "A-",
-  leadershipPts: 847,
-  tarbiyahScore: 92,
-  weekStreak: 7,
-};
-
-const recentActivity = [
-  { type: "mission", text: "Completed 'The Algebra Conquest' — earned 120 XP", time: "2h ago", icon: Star, color: "gold", status: "positive" },
-  { type: "tarbiyah", text: "Logged daily Dhikr for the 7th consecutive day 🕌", time: "5h ago", icon: Heart, color: "emerald", status: "positive" },
-  { type: "attendance", text: "Present — on time for Fajr study session", time: "Today", icon: CheckCircle2, color: "blue", status: "positive" },
-  { type: "alert", text: "Arabic assignment due tomorrow — not yet started", time: "Yesterday", icon: AlertCircle, color: "gold", status: "warning" },
-  { type: "award", text: "Earned 'Leadership Rising Star' badge", time: "2 days ago", icon: Star, color: "purple", status: "positive" },
-];
-
-const subjectGrades = [
-  { subject: "Quran & Tajweed", grade: "A", pct: 94, color: "gold" as const },
-  { subject: "Mathematics", grade: "B+", pct: 87, color: "emerald" as const },
-  { subject: "Arabic Language", grade: "B", pct: 82, color: "blue" as const },
-  { subject: "English Language Arts", grade: "A-", pct: 91, color: "gold" as const },
-  { subject: "Science", grade: "B+", pct: 85, color: "emerald" as const },
-  { subject: "Islamic Studies", grade: "A", pct: 96, color: "blue" as const },
-];
+import { useAuth } from "@/lib/auth-context";
+import { useStudentProfile, useActivityFeed } from "@/lib/db/hooks";
+import { useState } from "react";
+import type { LucideIcon } from "lucide-react";
 
 const upcomingEvents = [
   { title: "Parent-Teacher Conference", date: "Mar 12", teacher: "Ustadh Yusuf", type: "meeting" },
@@ -49,9 +25,84 @@ const colorMap: Record<string, { text: string; bg: string; border: string }> = {
   purple: { text: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
 };
 
+// Map activity feed types to icons + status
+const activityIconMap: Record<string, { icon: LucideIcon; color: string; status: string }> = {
+  mission_completed: { icon: Star,         color: "gold",   status: "positive" },
+  tarbiyah_checkin:  { icon: Heart,        color: "emerald",status: "positive" },
+  attendance:        { icon: CheckCircle2, color: "blue",   status: "positive" },
+  alert:             { icon: AlertCircle,  color: "gold",   status: "warning" },
+  badge_earned:      { icon: Star,         color: "purple", status: "positive" },
+};
+
+function gradeFromPct(pct: number): string {
+  if (pct >= 97) return "A+";
+  if (pct >= 93) return "A";
+  if (pct >= 90) return "A-";
+  if (pct >= 87) return "B+";
+  if (pct >= 83) return "B";
+  if (pct >= 80) return "B-";
+  if (pct >= 77) return "C+";
+  return "C";
+}
+
+function timeAgo(ts: { seconds: number } | undefined): string {
+  if (!ts) return "Recently";
+  const diff = Date.now() / 1000 - ts.seconds;
+  if (diff < 3600)  return `${Math.round(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.round(diff / 3600)}h ago`;
+  if (diff < 172800) return "Yesterday";
+  return `${Math.round(diff / 86400)} days ago`;
+}
+
 export default function ParentDashboard() {
+  const { user } = useAuth();
+  const [messageText, setMessageText] = useState("");
+
+  // Parent's child UID — stored in auth context user doc as childUid
+  // For demo we use the seeded parent who is linked to student-ahmed-001
+  const childUid = (user as unknown as { childUid?: string })?.childUid ?? "student-ahmed-001";
+
+  const { profile: childProfile, loading } = useStudentProfile(childUid);
+  const { feed } = useActivityFeed(childUid, 5);
+
+  const parentName    = user?.displayName ?? "Parent";
+  const userInitial   = parentName[0]?.toUpperCase() ?? "P";
+
+  const childName     = childProfile?.displayName ?? "Your Child";
+  const grade         = childProfile?.grade ? `Grade ${childProfile.grade}` : "Grade 7";
+  const teacher       = childProfile?.educatorName ?? "Ustadh Yusuf Khalid";
+  const attendance    = childProfile?.attendancePct ?? 96;
+  const leadershipPts = childProfile?.leadershipPts ?? 0;
+  const tarbiyahScore = childProfile?.tarbiyahScore ?? 0;
+  const weekStreak    = childProfile?.streak ?? 0;
+
+  // Overall grade from average pct
+  const avgPct        = childProfile?.subjectGrades?.length
+    ? Math.round(childProfile.subjectGrades.reduce((s, g) => s + g.pct, 0) / childProfile.subjectGrades.length)
+    : 88;
+  const overallGrade  = gradeFromPct(avgPct);
+
+  const subjectGrades = (childProfile?.subjectGrades ?? []).map((sg, i) => ({
+    subject: sg.subject,
+    grade:   sg.grade ?? gradeFromPct(sg.pct),
+    pct:     sg.pct,
+    color:   (["gold","emerald","blue","gold","emerald","blue"] as const)[i % 6],
+  }));
+
+  // Build activity rows from feed
+  const recentActivity = feed.map((item) => {
+    const meta = activityIconMap[item.type] ?? activityIconMap.mission_completed;
+    return {
+      text:   item.title + (item.detail ? ` — ${item.detail}` : ""),
+      time:   timeAgo(item.createdAt as unknown as { seconds: number }),
+      icon:   meta.icon,
+      color:  item.color ?? meta.color,
+      status: meta.status,
+    };
+  });
+
   return (
-    <DashboardShell role="parent" userName="Sister Fatima" userInitial="F" subtitle="Horizon Portal">
+    <DashboardShell role="parent" userName={parentName} userInitial={userInitial} subtitle="Horizon Portal">
       <div className="p-4 lg:p-8 space-y-8">
 
         {/* Live Pulse Header */}
@@ -70,23 +121,23 @@ export default function ParentDashboard() {
                 <span className="text-emerald-400 text-xs font-semibold uppercase tracking-widest">Live Pulse</span>
               </div>
               <h1 className="font-display text-2xl sm:text-3xl font-bold text-white mb-1">
-                {childData.name} is having an{" "}
-                <span className="text-emerald-gradient">excellent week.</span>
+                {loading ? "Loading..." : `${childName} is having an `}
+                {!loading && <span className="text-emerald-gradient">excellent week.</span>}
               </h1>
-              <p className="text-white/50 text-sm">{childData.grade} · Lead Teacher: {childData.teacher}</p>
+              <p className="text-white/50 text-sm">{grade} · Lead Teacher: {teacher}</p>
             </div>
 
             <div className="flex gap-6">
               <div className="text-center">
-                <div className="text-3xl font-bold text-emerald-400">{childData.attendance}%</div>
+                <div className="text-3xl font-bold text-emerald-400">{attendance}%</div>
                 <div className="text-white/40 text-xs">Attendance</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-gold-400">{childData.overallGrade}</div>
+                <div className="text-3xl font-bold text-gold-400">{overallGrade}</div>
                 <div className="text-white/40 text-xs">Overall Grade</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-purple-400">{childData.leadershipPts}</div>
+                <div className="text-3xl font-bold text-purple-400">{leadershipPts}</div>
                 <div className="text-white/40 text-xs">Leadership Pts</div>
               </div>
             </div>
@@ -193,11 +244,11 @@ export default function ParentDashboard() {
               <div className="glass rounded-2xl p-6 border border-emerald-500/20 text-center relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent" />
                 <div className="relative">
-                  <div className="text-6xl font-bold text-emerald-400 mb-2">{childData.tarbiyahScore}</div>
+                  <div className="text-6xl font-bold text-emerald-400 mb-2">{tarbiyahScore}</div>
                   <div className="text-white/40 text-sm mb-4">Character Score</div>
                   <div className="flex justify-center gap-4 text-sm">
                     <div className="text-center">
-                      <div className="text-gold-400 font-bold">{childData.weekStreak}🔥</div>
+                      <div className="text-gold-400 font-bold">{weekStreak}🔥</div>
                       <div className="text-white/30 text-xs">Day Streak</div>
                     </div>
                     <div className="text-center">
@@ -205,7 +256,7 @@ export default function ParentDashboard() {
                       <div className="text-white/30 text-xs">Badges Earned</div>
                     </div>
                   </div>
-                  <ProgressBar value={childData.tarbiyahScore} variant="emerald" className="mt-4" animated />
+                  <ProgressBar value={tarbiyahScore} variant="emerald" className="mt-4" animated />
                 </div>
               </div>
             </div>
@@ -253,8 +304,10 @@ export default function ParentDashboard() {
                 Message Teacher
               </h3>
               <textarea
-                placeholder="Write a note to Ustadh Yusuf…"
+                placeholder={`Write a note to ${teacher}…`}
                 rows={3}
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
                 className="w-full bg-nexus-border/40 border border-nexus-border rounded-xl px-3 py-2 text-white placeholder-white/20 text-sm resize-none focus:outline-none focus:border-blue-500/50 transition-all"
               />
               <button className="mt-3 w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-700 to-blue-500 text-white text-sm font-semibold flex items-center justify-center gap-2 hover:brightness-110 transition-all">

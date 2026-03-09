@@ -1,138 +1,31 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 import ProgressBar from "@/components/ui/ProgressBar";
 import Badge from "@/components/ui/Badge";
 import { Target, Clock, Zap, CheckCircle2, Lock, Play, Filter } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { useStudentProfile, toggleMissionTask } from "@/lib/db/hooks";
+import { getMissionsWithProgress } from "@/lib/db/hooks";
+import type { MissionDoc, MissionProgressDoc } from "@/lib/db/types";
 
 type MissionStatus = "active" | "completed" | "locked";
 type MissionColor = "gold" | "emerald" | "blue" | "purple";
 
-interface Mission {
+interface CombinedMission {
   id: string;
   title: string;
   subject: string;
   description: string;
   progress: number;
-  dueIn: string;
   xp: number;
   difficulty: string;
   status: MissionStatus;
   color: MissionColor;
-  tasks: { label: string; done: boolean }[];
+  tasks: { id: string; label: string; done: boolean }[];
+  rawProgress: MissionProgressDoc | null;
 }
-
-const missions: Mission[] = [
-  {
-    id: "1",
-    title: "The Algebra Conquest",
-    subject: "Mathematics",
-    description: "Master linear equations and inequalities through real-world problem sets.",
-    progress: 65,
-    dueIn: "2 days",
-    xp: 120,
-    difficulty: "Medium",
-    status: "active",
-    color: "gold",
-    tasks: [
-      { label: "Watch: Introduction to Algebra", done: true },
-      { label: "Complete Practice Set A (10 problems)", done: true },
-      { label: "Practice Set B (15 problems)", done: false },
-      { label: "Word Problem Challenge", done: false },
-      { label: "Submit Final Quiz", done: false },
-    ],
-  },
-  {
-    id: "2",
-    title: "The Badr Expedition",
-    subject: "Islamic History",
-    description: "Explore the Battle of Badr — its causes, events, and lasting lessons for Muslim leadership.",
-    progress: 40,
-    dueIn: "4 days",
-    xp: 90,
-    difficulty: "Medium",
-    status: "active",
-    color: "emerald",
-    tasks: [
-      { label: "Read: Context of Badr (Chapter 4)", done: true },
-      { label: "Watch documentary excerpt", done: true },
-      { label: "Map activity: The march to Badr", done: false },
-      { label: "Reflection essay (300 words)", done: false },
-    ],
-  },
-  {
-    id: "3",
-    title: "Shakespeare's Code",
-    subject: "English Language Arts",
-    description: "Analyze themes of ambition and morality in Macbeth through an Islamic leadership lens.",
-    progress: 80,
-    dueIn: "1 day",
-    xp: 80,
-    difficulty: "Hard",
-    status: "active",
-    color: "blue",
-    tasks: [
-      { label: "Read Acts I-II", done: true },
-      { label: "Character analysis worksheet", done: true },
-      { label: "Read Acts III-V", done: true },
-      { label: "Final essay: Leadership & Moral Courage", done: false },
-    ],
-  },
-  {
-    id: "4",
-    title: "The Quran Recitation Challenge",
-    subject: "Quran & Tajweed",
-    description: "Perfect your recitation of Surah Al-Mulk with proper Tajweed rules.",
-    progress: 100,
-    dueIn: "Completed",
-    xp: 150,
-    difficulty: "Hard",
-    status: "completed",
-    color: "gold",
-    tasks: [
-      { label: "Learn Makharij al-Huruf rules", done: true },
-      { label: "Practice Surah Al-Mulk verses 1-10", done: true },
-      { label: "Practice verses 11-20", done: true },
-      { label: "Full recitation recording submitted", done: true },
-    ],
-  },
-  {
-    id: "5",
-    title: "The Photosynthesis Lab",
-    subject: "Science",
-    description: "Conduct virtual experiments on plant biology and document your findings.",
-    progress: 100,
-    dueIn: "Completed",
-    xp: 100,
-    difficulty: "Easy",
-    status: "completed",
-    color: "emerald",
-    tasks: [
-      { label: "Virtual lab experiment", done: true },
-      { label: "Data recording worksheet", done: true },
-      { label: "Lab report submitted", done: true },
-    ],
-  },
-  {
-    id: "6",
-    title: "The Arabic Vocabulary Quest",
-    subject: "Arabic Language",
-    description: "Master 100 new Arabic vocabulary words and use them in context.",
-    progress: 0,
-    dueIn: "Next week",
-    xp: 110,
-    difficulty: "Medium",
-    status: "locked",
-    color: "purple",
-    tasks: [
-      { label: "Vocabulary flashcards set 1 (25 words)", done: false },
-      { label: "Vocabulary flashcards set 2 (25 words)", done: false },
-      { label: "Flashcards set 3 & 4 (50 words)", done: false },
-      { label: "Context sentences quiz", done: false },
-    ],
-  },
-];
 
 const colorMap: Record<string, { text: string; bg: string; border: string; gradient: string }> = {
   gold:   { text: "text-gold-400",   bg: "bg-gold-500/10",   border: "border-gold-500/20",   gradient: "from-gold-600 to-gold-400" },
@@ -142,24 +35,93 @@ const colorMap: Record<string, { text: string; bg: string; border: string; gradi
 };
 
 const difficultyColor: Record<string, string> = {
-  Easy: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+  Easy:   "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
   Medium: "text-gold-400 bg-gold-500/10 border-gold-500/20",
-  Hard: "text-red-400 bg-red-500/10 border-red-500/20",
+  Hard:   "text-red-400 bg-red-500/10 border-red-500/20",
 };
 
 type FilterType = "all" | "active" | "completed" | "locked";
 
 export default function MissionsPage() {
-  const [filter, setFilter] = useState<FilterType>("all");
-  const [expandedId, setExpandedId] = useState<string | null>("1");
+  const { user } = useAuth();
+  const { profile } = useStudentProfile(user?.uid ?? null);
+  const [filter, setFilter]       = useState<FilterType>("all");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [missions, setMissions]   = useState<CombinedMission[]>([]);
+  const [loading, setLoading]     = useState(true);
 
-  const filtered = filter === "all" ? missions : missions.filter((m) => m.status === filter);
-  const activeCount    = missions.filter((m) => m.status === "active").length;
-  const completedCount = missions.filter((m) => m.status === "completed").length;
-  const totalXP        = missions.filter((m) => m.status === "completed").reduce((s, m) => s + m.xp, 0);
+  useEffect(() => {
+    if (!user?.uid || !profile?.classId) return;
+    getMissionsWithProgress(user.uid, profile.classId).then((items) => {
+      const combined: CombinedMission[] = items.map(({ mission, progress }) => {
+        const m = mission as MissionDoc & { id: string };
+        const p = progress as MissionProgressDoc | null;
+        const tasksProgress = p?.tasksProgress ?? [];
+        return {
+          id:          m.id,
+          title:       m.title,
+          subject:     m.subject,
+          description: m.description,
+          progress:    p?.progress ?? 0,
+          xp:          m.xp,
+          difficulty:  m.difficulty,
+          status:      (p?.status ?? "locked") as MissionStatus,
+          color:       m.color as MissionColor,
+          tasks:       m.tasks.map((t) => ({
+            id:    t.id,
+            label: t.label,
+            done:  tasksProgress.find((tp) => tp.taskId === t.id)?.done ?? false,
+          })),
+          rawProgress: p,
+        };
+      });
+      combined.sort((a, b) => {
+        const order: Record<MissionStatus, number> = { active: 0, locked: 1, completed: 2 };
+        return order[a.status] - order[b.status];
+      });
+      setMissions(combined);
+      if (combined.find((m) => m.status === "active")) {
+        setExpandedId(combined.find((m) => m.status === "active")!.id);
+      }
+      setLoading(false);
+    });
+  }, [user?.uid, profile?.classId]);
+
+  const handleToggleTask = async (mission: CombinedMission, taskId: string) => {
+    if (!user?.uid || !mission.rawProgress) return;
+    await toggleMissionTask(
+      user.uid,
+      mission.id,
+      taskId,
+      mission.rawProgress,
+      mission.rawProgress.tasksProgress
+    );
+    // optimistic update
+    setMissions((prev) =>
+      prev.map((m) => {
+        if (m.id !== mission.id) return m;
+        const updatedTasks = m.tasks.map((t) => t.id === taskId ? { ...t, done: !t.done } : t);
+        const donePct = Math.round((updatedTasks.filter((t) => t.done).length / updatedTasks.length) * 100);
+        return {
+          ...m,
+          tasks: updatedTasks,
+          progress: donePct,
+          status: donePct === 100 ? "completed" : "active",
+        };
+      })
+    );
+  };
+
+  const filtered      = filter === "all" ? missions : missions.filter((m) => m.status === filter);
+  const activeCount   = missions.filter((m) => m.status === "active").length;
+  const completedCount= missions.filter((m) => m.status === "completed").length;
+  const totalXP       = missions.filter((m) => m.status === "completed").reduce((s, m) => s + m.xp, 0);
+
+  const firstName   = profile?.displayName?.split(" ")[0] ?? "Student";
+  const userInitial = firstName[0]?.toUpperCase() ?? "S";
 
   return (
-    <DashboardShell role="student" userName="Ahmed Al-Rashid" userInitial="A" subtitle="My Missions">
+    <DashboardShell role="student" userName={profile?.displayName ?? firstName} userInitial={userInitial} subtitle="My Missions">
       <div className="p-4 lg:p-8 space-y-6">
 
         {/* Header */}
@@ -214,13 +176,18 @@ export default function MissionsPage() {
           ))}
         </div>
 
+        {/* Loading */}
+        {loading && (
+          <div className="text-center py-12 text-white/30 animate-pulse">Loading missions...</div>
+        )}
+
         {/* Mission cards */}
         <div className="space-y-4">
           {filtered.map((mission, i) => {
-            const c = colorMap[mission.color];
+            const c = colorMap[mission.color] ?? colorMap.gold;
             const isExpanded = expandedId === mission.id;
-            const isLocked = mission.status === "locked";
-            const isDone = mission.status === "completed";
+            const isLocked   = mission.status === "locked";
+            const isDone     = mission.status === "completed";
 
             return (
               <motion.div
@@ -230,33 +197,32 @@ export default function MissionsPage() {
                 transition={{ delay: i * 0.07 }}
                 className={`glass rounded-2xl border ${c.border} overflow-hidden ${isLocked ? "opacity-60" : ""}`}
               >
-                {/* Mission header — clickable */}
+                {/* Mission header */}
                 <button
                   onClick={() => !isLocked && setExpandedId(isExpanded ? null : mission.id)}
                   className="w-full text-left p-5"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-4 flex-1 min-w-0">
-                      {/* Status icon */}
                       <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                        isDone ? "bg-gradient-to-br from-emerald-700 to-emerald-400" :
-                        isLocked ? "bg-nexus-border" :
+                        isDone   ? "bg-gradient-to-br from-emerald-700 to-emerald-400" :
+                        isLocked ? "bg-white/5" :
                         `bg-gradient-to-br ${c.gradient}`
                       }`}>
-                        {isDone    ? <CheckCircle2 size={20} className="text-white" /> :
-                         isLocked  ? <Lock size={20} className="text-white/40" /> :
-                                     <Target size={20} className="text-white" />}
+                        {isDone   ? <CheckCircle2 size={20} className="text-white" /> :
+                         isLocked ? <Lock size={20} className="text-white/40" /> :
+                                    <Target size={20} className="text-white" />}
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2 mb-1">
-                          <Badge variant={mission.color as "gold" | "emerald" | "blue" | "purple"}>{mission.subject}</Badge>
-                          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${difficultyColor[mission.difficulty]}`}>
+                          <Badge variant={mission.color}>{mission.subject}</Badge>
+                          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${difficultyColor[mission.difficulty] ?? difficultyColor.Medium}`}>
                             {mission.difficulty}
                           </span>
                           {!isLocked && !isDone && (
                             <span className="text-white/30 text-xs flex items-center gap-1">
-                              <Clock size={11} /> Due in {mission.dueIn}
+                              <Clock size={11} /> {mission.progress}% done
                             </span>
                           )}
                         </div>
@@ -303,20 +269,24 @@ export default function MissionsPage() {
                       Mission Tasks
                     </h4>
                     <div className="space-y-2.5">
-                      {mission.tasks.map((task, ti) => (
-                        <div key={ti} className="flex items-center gap-3">
+                      {mission.tasks.map((task) => (
+                        <div
+                          key={task.id}
+                          className="flex items-center gap-3 cursor-pointer group"
+                          onClick={() => !isDone && handleToggleTask(mission, task.id)}
+                        >
                           {task.done ? (
                             <CheckCircle2 size={16} className="text-emerald-400 flex-shrink-0" />
                           ) : (
-                            <div className={`w-4 h-4 rounded-full border-2 ${c.border} flex-shrink-0`} />
+                            <div className={`w-4 h-4 rounded-full border-2 ${c.border} flex-shrink-0 group-hover:border-white/40 transition-colors`} />
                           )}
                           <span className={`text-sm ${task.done ? "text-white/40 line-through" : "text-white/80"}`}>
                             {task.label}
                           </span>
                           {!task.done && !isDone && (
-                            <button className={`ml-auto text-xs ${c.text} hover:brightness-125 transition-colors flex items-center gap-1`}>
-                              <Zap size={12} /> Start
-                            </button>
+                            <span className={`ml-auto text-xs ${c.text} hover:brightness-125 transition-colors flex items-center gap-1 opacity-0 group-hover:opacity-100`}>
+                              <Zap size={12} /> Mark done
+                            </span>
                           )}
                         </div>
                       ))}

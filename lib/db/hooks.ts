@@ -1,0 +1,392 @@
+"use client";
+import { useEffect, useState } from "react";
+import {
+  doc, collection, query, where, orderBy, limit,
+  onSnapshot, getDoc, getDocs, setDoc, updateDoc,
+  addDoc, serverTimestamp, Timestamp,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import type {
+  StudentProfileDoc, MissionDoc, MissionProgressDoc,
+  TarbiyahDayDoc, ActivityFeedDoc, AttendanceDoc,
+  ClassDoc, UserDoc, WeeklyGoal, TaskProgress,
+} from "./types";
+
+// ─── helpers ──────────────────────────────────────────────────────────────
+function today(): string {
+  return new Date().toISOString().split("T")[0];
+}
+
+// ─── useStudentProfile ────────────────────────────────────────────────────
+export function useStudentProfile(uid: string | null) {
+  const [profile, setProfile] = useState<StudentProfileDoc | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!uid) { setLoading(false); return; }
+    const unsub = onSnapshot(doc(db, "studentProfiles", uid), (snap) => {
+      setProfile(snap.exists() ? (snap.data() as StudentProfileDoc) : null);
+      setLoading(false);
+    });
+    return unsub;
+  }, [uid]);
+
+  return { profile, loading };
+}
+
+// ─── useMissions (templates for a class) ─────────────────────────────────
+export function useClassMissions(classId: string | null) {
+  const [missions, setMissions] = useState<MissionDoc[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!classId) { setLoading(false); return; }
+    const q = query(
+      collection(db, "missions"),
+      where("classId", "==", classId),
+      where("isPublished", "==", true),
+      orderBy("createdAt", "desc")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setMissions(snap.docs.map((d) => ({ id: d.id, ...d.data() } as MissionDoc & { id: string })));
+      setLoading(false);
+    });
+    return unsub;
+  }, [classId]);
+
+  return { missions, loading };
+}
+
+// ─── useMissionProgress (all missions for a student) ──────────────────────
+export function useMissionProgress(studentUid: string | null) {
+  const [progress, setProgress] = useState<(MissionProgressDoc & { id: string })[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!studentUid) { setLoading(false); return; }
+    const q = query(
+      collection(db, "studentProfiles", studentUid, "missionProgress"),
+      orderBy("updatedAt", "desc")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setProgress(snap.docs.map((d) => ({ id: d.id, ...d.data() } as MissionProgressDoc & { id: string })));
+      setLoading(false);
+    });
+    return unsub;
+  }, [studentUid]);
+
+  return { progress, loading };
+}
+
+// ─── useTodayTarbiyah ─────────────────────────────────────────────────────
+export function useTodayTarbiyah(studentUid: string | null) {
+  const [tarbiyah, setTarbiyah] = useState<TarbiyahDayDoc | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!studentUid) { setLoading(false); return; }
+    const ref = doc(db, "studentProfiles", studentUid, "tarbiyah", today());
+    const unsub = onSnapshot(ref, (snap) => {
+      setTarbiyah(snap.exists() ? (snap.data() as TarbiyahDayDoc) : null);
+      setLoading(false);
+    });
+    return unsub;
+  }, [studentUid]);
+
+  return { tarbiyah, loading };
+}
+
+// ─── useTarbiyahHistory (last 30 days) ───────────────────────────────────
+export function useTarbiyahHistory(studentUid: string | null) {
+  const [history, setHistory] = useState<TarbiyahDayDoc[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!studentUid) { setLoading(false); return; }
+    const q = query(
+      collection(db, "studentProfiles", studentUid, "tarbiyah"),
+      orderBy("date", "desc"),
+      limit(30)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setHistory(snap.docs.map((d) => d.data() as TarbiyahDayDoc));
+      setLoading(false);
+    });
+    return unsub;
+  }, [studentUid]);
+
+  return { history, loading };
+}
+
+// ─── useActivityFeed (for parent/educator) ───────────────────────────────
+export function useActivityFeed(studentUid: string | null, limitCount = 20) {
+  const [feed, setFeed] = useState<(ActivityFeedDoc & { id: string })[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!studentUid) { setLoading(false); return; }
+    const q = query(
+      collection(db, "activityFeed"),
+      where("studentUid", "==", studentUid),
+      orderBy("createdAt", "desc"),
+      limit(limitCount)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setFeed(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ActivityFeedDoc & { id: string })));
+      setLoading(false);
+    });
+    return unsub;
+  }, [studentUid, limitCount]);
+
+  return { feed, loading };
+}
+
+// ─── useClassStudents (educator) ─────────────────────────────────────────
+export function useClassStudents(classId: string | null) {
+  const [students, setStudents] = useState<(StudentProfileDoc & { uid: string })[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!classId) { setLoading(false); return; }
+    const q = query(
+      collection(db, "studentProfiles"),
+      where("classId", "==", classId),
+      orderBy("leadershipPts", "desc")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setStudents(snap.docs.map((d) => ({ uid: d.id, ...d.data() } as StudentProfileDoc & { uid: string })));
+      setLoading(false);
+    });
+    return unsub;
+  }, [classId]);
+
+  return { students, loading };
+}
+
+// ─── useAttendance (student, last 30 records) ────────────────────────────
+export function useAttendance(studentUid: string | null) {
+  const [records, setRecords] = useState<(AttendanceDoc & { id: string })[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!studentUid) { setLoading(false); return; }
+    const q = query(
+      collection(db, "attendance"),
+      where("studentUid", "==", studentUid),
+      orderBy("date", "desc"),
+      limit(30)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setRecords(snap.docs.map((d) => ({ id: d.id, ...d.data() } as AttendanceDoc & { id: string })));
+      setLoading(false);
+    });
+    return unsub;
+  }, [studentUid]);
+
+  return { records, loading };
+}
+
+// ─── useEducatorClass (classDoc + students by educatorUid) ────────────────
+export function useEducatorClass(educatorUid: string | null) {
+  const [classDoc, setClassDoc] = useState<(ClassDoc & { id: string }) | null>(null);
+  const [students, setStudents] = useState<(StudentProfileDoc & { uid: string })[]>([]);
+  const [loading, setLoading]   = useState(true);
+
+  useEffect(() => {
+    if (!educatorUid) { setLoading(false); return; }
+    // First resolve the class for this educator
+    getDocs(query(collection(db, "classes"), where("educatorUid", "==", educatorUid), limit(1))).then((snap) => {
+      if (snap.empty) { setLoading(false); return; }
+      const cdoc = { id: snap.docs[0].id, ...snap.docs[0].data() } as ClassDoc & { id: string };
+      setClassDoc(cdoc);
+      // Then subscribe to students in that class
+      const q = query(
+        collection(db, "studentProfiles"),
+        where("classId", "==", cdoc.id),
+        orderBy("leadershipPts", "desc")
+      );
+      const unsub = onSnapshot(q, (s) => {
+        setStudents(s.docs.map((d) => ({ uid: d.id, ...d.data() } as StudentProfileDoc & { uid: string })));
+        setLoading(false);
+      });
+      return unsub;
+    });
+  }, [educatorUid]);
+
+  return { classDoc, students, loading };
+}
+
+// ─── useClassDoc ─────────────────────────────────────────────────────────
+export function useClassDoc(classId: string | null) {
+  const [classDoc, setClassDoc] = useState<(ClassDoc & { id: string }) | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!classId) { setLoading(false); return; }
+    const unsub = onSnapshot(doc(db, "classes", classId), (snap) => {
+      setClassDoc(snap.exists() ? ({ id: snap.id, ...snap.data() } as ClassDoc & { id: string }) : null);
+      setLoading(false);
+    });
+    return unsub;
+  }, [classId]);
+
+  return { classDoc, loading };
+}
+
+// ─── mutations ────────────────────────────────────────────────────────────
+
+// Toggle a tarbiyah task for today
+export async function toggleTarbiyahTask(
+  studentUid: string,
+  categoryId: string,
+  taskIndex: number,
+  currentDoc: TarbiyahDayDoc
+) {
+  const ref = doc(db, "studentProfiles", studentUid, "tarbiyah", today());
+  const updated = { ...currentDoc };
+  const cat = updated.categories.find((c) => c.id === categoryId);
+  if (!cat) return;
+  cat.tasks[taskIndex].done = !cat.tasks[taskIndex].done;
+
+  // Recompute points
+  const POINTS_PER_TASK = 10;
+  let totalPoints = 0;
+  let totalMax = 0;
+  for (const c of updated.categories) {
+    const done = c.tasks.filter((t) => t.done).length;
+    c.pointsEarned = done * POINTS_PER_TASK;
+    totalPoints += c.pointsEarned;
+    totalMax += c.tasks.length * POINTS_PER_TASK;
+  }
+  updated.totalPoints = totalPoints;
+  updated.totalMax = totalMax;
+  updated.overallPct = totalMax > 0 ? Math.round((totalPoints / totalMax) * 100) : 0;
+  updated.updatedAt = Timestamp.now();
+
+  await setDoc(ref, updated);
+
+  // Update aggregate tarbiyahScore on profile
+  await updateDoc(doc(db, "studentProfiles", studentUid), {
+    tarbiyahScore: updated.overallPct,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+// Toggle a mission task
+export async function toggleMissionTask(
+  studentUid: string,
+  missionId: string,
+  taskId: string,
+  currentProgress: MissionProgressDoc,
+  allTasks: TaskProgress[]
+) {
+  const ref = doc(db, "studentProfiles", studentUid, "missionProgress", missionId);
+  const updated = allTasks.map((t) =>
+    t.taskId === taskId ? { ...t, done: !t.done, completedAt: !t.done ? Timestamp.now() : undefined } : t
+  );
+  const done = updated.filter((t) => t.done).length;
+  const pct  = Math.round((done / updated.length) * 100);
+  const isCompleted = pct === 100;
+
+  const patch: Partial<MissionProgressDoc> = {
+    tasksProgress: updated,
+    progress: pct,
+    status: isCompleted ? "completed" : "active",
+    updatedAt: Timestamp.now(),
+  };
+  if (isCompleted && !currentProgress.completedAt) {
+    patch.completedAt = Timestamp.now();
+    patch.xpEarned = currentProgress.xpEarned; // already set at creation
+  }
+
+  await updateDoc(ref, patch as Record<string, unknown>);
+
+  if (isCompleted) {
+    await updateDoc(doc(db, "studentProfiles", studentUid), {
+      completedMissionCount: (currentProgress.status !== "completed" ? 1 : 0),
+      updatedAt: serverTimestamp(),
+    });
+    // Log activity
+    await addDoc(collection(db, "activityFeed"), {
+      studentUid,
+      type: "mission_completed",
+      title: "Mission Completed!",
+      detail: `Earned ${currentProgress.xpEarned} XP`,
+      color: "gold",
+      createdAt: serverTimestamp(),
+    });
+  }
+}
+
+// Update weekly goal
+export async function toggleWeeklyGoal(studentUid: string, goalId: string, currentGoals: WeeklyGoal[]) {
+  const updated = currentGoals.map((g) => g.id === goalId ? { ...g, done: !g.done } : g);
+  await updateDoc(doc(db, "studentProfiles", studentUid), {
+    weeklyGoals: updated,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+// Get all students for an educator (one-time fetch)
+export async function getEducatorStudents(educatorUid: string) {
+  const q = query(
+    collection(db, "studentProfiles"),
+    where("educatorUid", "==", educatorUid),
+    orderBy("leadershipPts", "desc")
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ uid: d.id, ...d.data() } as StudentProfileDoc & { uid: string }));
+}
+
+// Get educator's class
+export async function getEducatorClass(educatorUid: string) {
+  const q = query(collection(db, "classes"), where("educatorUid", "==", educatorUid), limit(1));
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  return { id: snap.docs[0].id, ...snap.docs[0].data() } as ClassDoc & { id: string };
+}
+
+// Get user doc
+export async function getUserDoc(uid: string): Promise<UserDoc | null> {
+  const snap = await getDoc(doc(db, "users", uid));
+  return snap.exists() ? (snap.data() as UserDoc) : null;
+}
+
+// Get missions with student progress merged (for missions page)
+export async function getMissionsWithProgress(studentUid: string, classId: string) {
+  const [missionsSnap, progressSnap] = await Promise.all([
+    getDocs(query(collection(db, "missions"), where("classId", "==", classId), where("isPublished", "==", true))),
+    getDocs(collection(db, "studentProfiles", studentUid, "missionProgress")),
+  ]);
+
+  const progressMap = new Map<string, MissionProgressDoc>();
+  progressSnap.docs.forEach((d) => progressMap.set(d.id, d.data() as MissionProgressDoc));
+
+  return missionsSnap.docs.map((d) => {
+    const mission = { id: d.id, ...d.data() } as MissionDoc & { id: string };
+    const prog = progressMap.get(d.id);
+    return { mission, progress: prog ?? null };
+  });
+}
+
+// Ensure today's tarbiyah doc exists (create skeleton if missing)
+export async function ensureTodayTarbiyah(studentUid: string, template: TarbiyahDayDoc) {
+  const ref = doc(db, "studentProfiles", studentUid, "tarbiyah", today());
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    await setDoc(ref, {
+      ...template,
+      date: today(),
+      studentUid,
+      totalPoints: 0,
+      overallPct: 0,
+      categories: template.categories.map((c) => ({
+        ...c,
+        pointsEarned: 0,
+        tasks: c.tasks.map((t) => ({ ...t, done: false })),
+      })),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  }
+}
