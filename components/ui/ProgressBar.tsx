@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 interface ProgressBarProps {
   value: number;
   max?: number;
-  variant?: "gold" | "emerald" | "blue" | "purple";
+  variant?: "gold" | "emerald" | "blue" | "purple" | "rose" | "teal";
   size?: "sm" | "md" | "lg";
   showLabel?: boolean;
   label?: string;
@@ -26,11 +26,13 @@ export default function ProgressBar({
   const pct = Math.min(Math.max((value / max) * 100, 0), 100);
 
   const trackSizes = { sm: "h-1.5", md: "h-2.5", lg: "h-4" };
-  const fills = {
-    gold: "from-gold-600 to-gold-400",
+  const fills: Record<string, string> = {
+    gold:    "from-gold-600 to-gold-400",
     emerald: "from-emerald-700 to-emerald-400",
-    blue: "from-blue-700 to-blue-400",
-    purple: "from-purple-700 to-purple-400",
+    blue:    "from-blue-700 to-blue-400",
+    purple:  "from-purple-700 to-purple-400",
+    rose:    "from-rose-700 to-rose-400",
+    teal:    "from-teal-700 to-teal-400",
   };
 
   return (

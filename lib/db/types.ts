@@ -215,6 +215,71 @@ export interface MessageDoc {
   createdAt: Timestamp;
 }
 
+// ─── programs/{programId} ─────────────────────────────────────────────────
+export type ProgramColor = "gold" | "emerald" | "blue" | "purple" | "rose" | "teal";
+export type GradeBand = "preK-2" | "3-5" | "5-9" | "6-9" | "all";
+
+export interface ProgramDoc {
+  id: string;
+  slug: string;             // e.g. "quran-islamic-studies"
+  title: string;            // e.g. "Quran & Islamic Studies"
+  subtitle: string;         // e.g. "Moral & Spiritual Foundations of Leadership"
+  description: string;
+  arabicTitle?: string;     // e.g. "لُغَةُ القُرآنِ"
+  arabicSubtitle?: string;
+  gradeBand: GradeBand;     // grade range string
+  gradeMin: number;         // 0 = Pre-K
+  gradeMax: number;         // 9
+  color: ProgramColor;
+  icon: string;             // lucide icon name
+  subjectIds: string[];     // references to subjects/{subjectId}
+  order: number;            // display order
+  isActive: boolean;
+  schoolId: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+// ─── subjects/{subjectId} ─────────────────────────────────────────────────
+export interface SubjectDoc {
+  id: string;
+  programId: string;
+  name: string;             // e.g. "Quran Recitation & Tajweed"
+  nameArabic?: string;
+  description: string;
+  color: ProgramColor;
+  gradeBand: GradeBand;
+  gradeMin: number;
+  gradeMax: number;
+  weeklyHours: number;      // sessions per week
+  icon: string;
+  order: number;            // within program
+  schoolId: string;
+  createdAt: Timestamp;
+}
+
+// ─── curriculumUnits/{unitId} ──────────────────────────────────────────────
+export type UnitType = "lesson" | "project" | "assessment" | "activity" | "lab" | "recitation";
+
+export interface CurriculumUnit {
+  id: string;
+  subjectId: string;
+  programId: string;
+  title: string;
+  description: string;
+  type: UnitType;
+  gradeBand: GradeBand;
+  gradeMin: number;
+  gradeMax: number;
+  durationWeeks: number;
+  objectives: string[];     // learning objectives
+  islamicConnections?: string[]; // how it connects to Islamic values
+  order: number;
+  schoolId: string;
+  academicYear: string;
+  createdAt: Timestamp;
+}
+
 // ─── notifications/{uid}/items/{itemId} ───────────────────────────────────
 export interface NotificationDoc {
   type: ActivityType;

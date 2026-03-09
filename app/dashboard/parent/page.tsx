@@ -5,10 +5,10 @@ import ProgressBar from "@/components/ui/ProgressBar";
 import Badge from "@/components/ui/Badge";
 import {
   TrendingUp, Calendar, MessageSquare, Video, Star, Heart,
-  CheckCircle2, AlertCircle, Clock, Zap, Bell, Globe
+  CheckCircle2, AlertCircle, Clock, Zap, Bell, Globe, BookOpen
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { useStudentProfile, useActivityFeed } from "@/lib/db/hooks";
+import { useStudentProfile, useActivityFeed, usePrograms } from "@/lib/db/hooks";
 import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
 
@@ -18,11 +18,13 @@ const upcomingEvents = [
   { title: "Math Exam: Algebra Unit", date: "Mar 20", teacher: "Ms. Rahman", type: "exam" },
 ];
 
-const colorMap: Record<string, { text: string; bg: string; border: string }> = {
-  gold:   { text: "text-gold-400",   bg: "bg-gold-500/10",   border: "border-gold-500/20" },
-  emerald:{ text: "text-emerald-400",bg: "bg-emerald-500/10",border: "border-emerald-500/20" },
-  blue:   { text: "text-blue-400",   bg: "bg-blue-500/10",   border: "border-blue-500/20" },
-  purple: { text: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
+const colorMap: Record<string, { text: string; bg: string; border: string; gradient: string }> = {
+  gold:   { text: "text-gold-400",   bg: "bg-gold-500/10",   border: "border-gold-500/20",   gradient: "from-gold-600 to-gold-400" },
+  emerald:{ text: "text-emerald-400",bg: "bg-emerald-500/10",border: "border-emerald-500/20", gradient: "from-emerald-700 to-emerald-400" },
+  blue:   { text: "text-blue-400",   bg: "bg-blue-500/10",   border: "border-blue-500/20",   gradient: "from-blue-700 to-blue-400" },
+  purple: { text: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20", gradient: "from-purple-700 to-purple-400" },
+  rose:   { text: "text-rose-400",   bg: "bg-rose-500/10",   border: "border-rose-500/20",   gradient: "from-rose-700 to-rose-400" },
+  teal:   { text: "text-teal-400",   bg: "bg-teal-500/10",   border: "border-teal-500/20",   gradient: "from-teal-700 to-teal-400" },
 };
 
 // Map activity feed types to icons + status
@@ -64,6 +66,7 @@ export default function ParentDashboard() {
 
   const { profile: childProfile, loading } = useStudentProfile(childUid);
   const { feed } = useActivityFeed(childUid, 5);
+  const { programs } = usePrograms("almadinah-queens");
 
   const parentName    = user?.displayName ?? "Parent";
   const userInitial   = parentName[0]?.toUpperCase() ?? "P";
@@ -82,11 +85,11 @@ export default function ParentDashboard() {
     : 88;
   const overallGrade  = gradeFromPct(avgPct);
 
-  const subjectGrades = (childProfile?.subjectGrades ?? []).map((sg, i) => ({
+  const subjectGrades = (childProfile?.subjectGrades ?? []).map((sg) => ({
     subject: sg.subject,
     grade:   sg.grade ?? gradeFromPct(sg.pct),
     pct:     sg.pct,
-    color:   (["gold","emerald","blue","gold","emerald","blue"] as const)[i % 6],
+    color:   sg.color ?? "gold",
   }));
 
   // Build activity rows from feed
@@ -317,6 +320,65 @@ export default function ParentDashboard() {
             </div>
           </div>
         </div>
+
+        {/* Programs Overview */}
+        {programs.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-white font-semibold text-lg flex items-center gap-2">
+                <Globe size={18} className="text-emerald-400" />
+                {childName}&apos;s Programs — Al-Madinah 2025–2026
+              </h2>
+              <span className="text-white/30 text-xs">{programs.length} active programs</span>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {programs.map((prog, i) => {
+                const c = colorMap[prog.color] ?? colorMap.gold;
+                const relatedGrades = subjectGrades.filter((sg) =>
+                  (prog.subjectIds ?? []).some((sid: string) =>
+                    sid.toLowerCase().includes(sg.subject.split(" ")[0].toLowerCase()) ||
+                    sg.subject.toLowerCase().includes(prog.slug?.replace(/-/g, " ") ?? "")
+                  )
+                );
+                const progAvg = relatedGrades.length > 0
+                  ? Math.round(relatedGrades.reduce((s, g) => s + g.pct, 0) / relatedGrades.length)
+                  : avgPct;
+                return (
+                  <motion.div
+                    key={prog.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.07 }}
+                    className={`glass rounded-2xl p-5 border ${c.border} relative overflow-hidden`}
+                  >
+                    <div className={`absolute top-0 right-0 w-24 h-24 ${c.bg} rounded-full blur-2xl`} />
+                    <div className="relative">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${c.gradient} flex items-center justify-center`}>
+                          <BookOpen size={15} className="text-white" />
+                        </div>
+                        <span className={`text-xs font-bold ${c.text}`}>{progAvg}%</span>
+                      </div>
+                      <h3 className="text-white font-bold text-sm mb-0.5">{prog.title}</h3>
+                      {prog.arabicTitle && (
+                        <p className={`font-arabic text-xs ${c.text} mb-1`}>{prog.arabicTitle}</p>
+                      )}
+                      <p className="text-white/30 text-xs mb-3">
+                        Grades {prog.gradeMin === 0 ? "Pre-K" : prog.gradeMin}–{prog.gradeMax}
+                      </p>
+                      <ProgressBar
+                        value={progAvg}
+                        variant={prog.color as "gold" | "emerald" | "blue" | "purple" | "rose" | "teal"}
+                        size="sm"
+                        animated
+                      />
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </DashboardShell>
   );

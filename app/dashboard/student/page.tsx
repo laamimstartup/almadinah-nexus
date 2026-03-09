@@ -12,12 +12,26 @@ import { useAuth } from "@/lib/auth-context";
 import { useStudentProfile, useMissionProgress, toggleWeeklyGoal } from "@/lib/db/hooks";
 
 const SUBJECT_COLORS: Record<string, string> = {
-  "Quran & Tajweed":       "#C9A84C",
-  "Mathematics":           "#10b981",
-  "Arabic Language":       "#3b82f6",
-  "English Language Arts": "#f97316",
-  "Science":               "#a855f7",
-  "Islamic Studies":       "#ec4899",
+  "Quran & Tajweed":        "#C9A84C",
+  "Mathematics":            "#10b981",
+  "Arabic Language":        "#3b82f6",
+  "English Language Arts":  "#f97316",
+  "Science":                "#a855f7",
+  "Islamic Studies":        "#ec4899",
+  "Coding":                 "#8b5cf6",
+  "Leadership":             "#f43f5e",
+  "Aqeedah":                "#C9A84C",
+  "Fiqh":                   "#d97706",
+  "Seerah & Islamic History": "#059669",
+  "Classical Arabic":       "#0ea5e9",
+  "Advanced Mathematics":   "#10b981",
+  "Science Labs":           "#a855f7",
+  "Digital Literacy":       "#6366f1",
+  "Public Speaking & Debate": "#f43f5e",
+  "Community Service Projects": "#14b8a6",
+  "Islamic Calligraphy":    "#d97706",
+  "Physical Education":     "#22c55e",
+  "Social-Emotional Learning": "#06b6d4",
 };
 
 const colorMap: Record<string, { badge: string; icon: string; text: string; border: string }> = {

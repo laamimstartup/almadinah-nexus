@@ -10,6 +10,7 @@ import type {
   StudentProfileDoc, MissionDoc, MissionProgressDoc,
   TarbiyahDayDoc, ActivityFeedDoc, AttendanceDoc,
   ClassDoc, UserDoc, WeeklyGoal, TaskProgress,
+  ProgramDoc, SubjectDoc, CurriculumUnit,
 } from "./types";
 
 // ─── helpers ──────────────────────────────────────────────────────────────
@@ -367,6 +368,119 @@ export async function getMissionsWithProgress(studentUid: string, classId: strin
     const prog = progressMap.get(d.id);
     return { mission, progress: prog ?? null };
   });
+}
+
+// ─── usePrograms ──────────────────────────────────────────────────────────
+export function usePrograms(schoolId: string | null) {
+  const [programs, setPrograms] = useState<(ProgramDoc & { id: string })[]>([]);
+  const [loading, setLoading]   = useState(true);
+
+  useEffect(() => {
+    if (!schoolId) { setLoading(false); return; }
+    const q = query(
+      collection(db, "programs"),
+      where("schoolId", "==", schoolId),
+      where("isActive", "==", true),
+      orderBy("order", "asc")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setPrograms(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ProgramDoc & { id: string })));
+      setLoading(false);
+    });
+    return unsub;
+  }, [schoolId]);
+
+  return { programs, loading };
+}
+
+// ─── useSubjects (all subjects for a school) ──────────────────────────────
+export function useSubjects(schoolId: string | null) {
+  const [subjects, setSubjects] = useState<(SubjectDoc & { id: string })[]>([]);
+  const [loading, setLoading]   = useState(true);
+
+  useEffect(() => {
+    if (!schoolId) { setLoading(false); return; }
+    const q = query(
+      collection(db, "subjects"),
+      where("schoolId", "==", schoolId),
+      orderBy("order", "asc")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setSubjects(snap.docs.map((d) => ({ id: d.id, ...d.data() } as SubjectDoc & { id: string })));
+      setLoading(false);
+    });
+    return unsub;
+  }, [schoolId]);
+
+  return { subjects, loading };
+}
+
+// ─── useSubjectsByProgram ─────────────────────────────────────────────────
+export function useSubjectsByProgram(programId: string | null) {
+  const [subjects, setSubjects] = useState<(SubjectDoc & { id: string })[]>([]);
+  const [loading, setLoading]   = useState(true);
+
+  useEffect(() => {
+    if (!programId) { setLoading(false); return; }
+    const q = query(
+      collection(db, "subjects"),
+      where("programId", "==", programId),
+      orderBy("order", "asc")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setSubjects(snap.docs.map((d) => ({ id: d.id, ...d.data() } as SubjectDoc & { id: string })));
+      setLoading(false);
+    });
+    return unsub;
+  }, [programId]);
+
+  return { subjects, loading };
+}
+
+// ─── useCurriculumUnits ───────────────────────────────────────────────────
+export function useCurriculumUnits(subjectId: string | null) {
+  const [units, setUnits]     = useState<(CurriculumUnit & { id: string })[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!subjectId) { setLoading(false); return; }
+    const q = query(
+      collection(db, "curriculumUnits"),
+      where("subjectId", "==", subjectId),
+      orderBy("order", "asc")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setUnits(snap.docs.map((d) => ({ id: d.id, ...d.data() } as CurriculumUnit & { id: string })));
+      setLoading(false);
+    });
+    return unsub;
+  }, [subjectId]);
+
+  return { units, loading };
+}
+
+// ─── useMissionsBySubject ─────────────────────────────────────────────────
+export function useMissionsBySubject(subjectId: string | null, classId: string | null) {
+  const [missions, setMissions] = useState<(MissionDoc & { id: string })[]>([]);
+  const [loading, setLoading]   = useState(true);
+
+  useEffect(() => {
+    if (!subjectId || !classId) { setLoading(false); return; }
+    const q = query(
+      collection(db, "missions"),
+      where("subjectId", "==", subjectId),
+      where("classId", "==", classId),
+      where("isPublished", "==", true),
+      orderBy("createdAt", "desc")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setMissions(snap.docs.map((d) => ({ id: d.id, ...d.data() } as MissionDoc & { id: string })));
+      setLoading(false);
+    });
+    return unsub;
+  }, [subjectId, classId]);
+
+  return { missions, loading };
 }
 
 // Ensure today's tarbiyah doc exists (create skeleton if missing)
